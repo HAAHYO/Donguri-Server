@@ -45,3 +45,12 @@ tasks.withType<Test> {
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
     }
 }
+
+// Dockerfile이 버전과 무관하게 jar를 찾도록 고정 이름 사용, plain jar는 생성하지 않음
+tasks.bootJar {
+    archiveFileName = "app.jar"
+}
+
+tasks.jar {
+    enabled = false
+}
