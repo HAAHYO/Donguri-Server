@@ -27,6 +27,10 @@ jobs:
       # Gradle 캐시 + wrapper 검증(위조된 gradle-wrapper.jar 차단)
       - uses: gradle/actions/setup-gradle@v5
 
+      # 에이전트 하네스 hook(guard_git.py) 회귀 테스트
+      - name: Harness tests
+        run: python3 .claude/hooks/test_guard_git.py
+
       # 로컬 Stop hook과 동일한 검증 명령 (ktlint + 테스트)
       - name: Check
         run: ./gradlew check --console=plain
