@@ -14,7 +14,9 @@ description: "Donguri(Kotlin 2.3 / Spring Boot 4 / JDK 21) 코드 컨벤션 — 
 | 항목 | 값 |
 |------|-----|
 | Kotlin | 2.3, `-Xjsr305=strict`, `-Xannotation-default-target=param-property` |
-| Spring Boot | 4.x — `spring-boot-starter-webmvc`, `-validation`, `-actuator` |
+| Spring Boot | 4.x — `spring-boot-starter-webmvc`, `-validation`, `-actuator`, `-data-jpa` |
+| DB | MySQL 8 (`mysql-connector-j`), 테스트·스모크는 H2 MySQL 모드. 접속 정보는 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` 환경변수 |
+| API 문서 | springdoc-openapi 3.x (`/swagger-ui.html`, `/v3/api-docs`) |
 | JSON | Jackson 3 (`tools.jackson.*` 패키지 — `com.fasterxml.jackson` 아님) |
 | 테스트 | JUnit Jupiter 6 (Boot 4 BOM, `junit-bom` 6.x), `kotlin-test-junit5`, Boot 4 테스트 스타터(`*-test`) |
 
@@ -28,10 +30,12 @@ com.donguri
 │   ├── <Domain>Controller.kt
 │   ├── <Domain>Service.kt
 │   ├── <Domain>.kt           도메인 모델/엔티티
-│   ├── <Domain>Repository.kt (영속성 도입 후)
+│   ├── <Domain>Repository.kt JpaRepository. Enum 은 별도 파일 <Domain><Name>.kt
 │   ├── <Domain>Exception.kt
 │   └── dto/                  <Action>Request.kt, <Domain>Response.kt
 └── global/
+    ├── entity/               BaseTimeEntity (createdAt/updatedAt, Hibernate 자동 기록)
+    ├── init/                 DataInitializer (local 프로필 시딩)
     ├── error/                ErrorCode, DonguriException, GlobalExceptionHandler
     └── config/
 ```
@@ -81,3 +85,11 @@ class AcornNotFoundException : DonguriException(ErrorCode.ACORN_NOT_FOUND)
 
 - `application.properties` 에 비밀값을 넣지 않는다 — `${ENV_NAME}` 참조 + GitHub Secrets.
 - 새 필수 설정은 CD 환경에도 있어야 부팅된다. 추가하면 PR 본문에 명시한다.
+
+## JPA 엔티티
+
+- 생성자 프로퍼티로 필수 값을 받고, 식별자는 본문의 `@Id @GeneratedValue(strategy = IDENTITY) val id: Long? = null`.
+- `kotlin("plugin.jpa")` + allOpen(`Entity`, `MappedSuperclass`, `Embeddable`)이 설정돼 있다 — `open` 을 직접 쓰지 않는다.
+- 연관관계는 모두 `FetchType.LAZY`, Enum 은 `EnumType.STRING`, 금액은 `BigDecimal` + `precision/scale` 명시.
+- 엔티티를 컨트롤러 응답으로 반환하지 않는다(위 레이어 역할). `open-in-view` 는 꺼져 있으므로 지연 로딩은 서비스의 트랜잭션 안에서 끝낸다.
+- 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`), 프로필은 `@ActiveProfiles("test")`.
