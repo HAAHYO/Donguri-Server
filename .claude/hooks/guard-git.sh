@@ -8,7 +8,8 @@
 input="$(cat)"
 
 py=""
-for cand in ${GUARD_PYTHON:-python python3}; do
+if [ -n "${GUARD_PYTHON:-}" ]; then set -- "$GUARD_PYTHON"; else set -- python python3; fi  # 경로에 공백이 있어도 하나로 취급
+for cand in "$@"; do
   if "$cand" -c "import sys; sys.exit(0)" >/dev/null 2>&1; then
     py="$cand"
     break

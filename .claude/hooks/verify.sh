@@ -13,7 +13,8 @@ max_attempts=3
 if [ -n "$(git status --porcelain -- .claude/hooks 2>/dev/null)" ]; then
   # guard-git.sh 와 같은 방식: 존재가 아니라 "실제로 실행되는" python 을 고른다 (WindowsApps 스텁 회피)
   py=""
-  for cand in ${GUARD_PYTHON:-python python3}; do
+  if [ -n "${GUARD_PYTHON:-}" ]; then set -- "$GUARD_PYTHON"; else set -- python python3; fi  # 경로에 공백이 있어도 하나로 취급
+  for cand in "$@"; do
     if "$cand" -c "import sys; sys.exit(0)" >/dev/null 2>&1; then
       py="$cand"
       break
@@ -29,7 +30,7 @@ if [ -n "$(git status --porcelain -- .claude/hooks 2>/dev/null)" ]; then
       exit 0
     fi
     {
-      echo "hook 회귀 테스트 실패 (python .claude/hooks/test_guard_git.py). 아래 오류를 고친 뒤 다시 마무리하세요."
+      echo "hook 회귀 테스트 실패 (${py} .claude/hooks/test_guard_git.py). 아래 오류를 고친 뒤 다시 마무리하세요."
       echo "$hook_log" | grep -E "FAIL|ERROR|Error|assert" | tail -20
     } >&2
     exit 2

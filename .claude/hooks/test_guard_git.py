@@ -343,6 +343,14 @@ class GuardGitTest(unittest.TestCase):
         env["GUARD_PYTHON"] = sys.executable
         self.assertEqual(run("git add ."), 2)
         self.assertEqual(run("git status"), 0)
+        # 인터프리터 경로에 공백이 있어도 하나의 후보로 취급한다 (C:\Program Files\... 등)
+        spaced = os.path.join(self.repo, "py dir", "python")
+        os.makedirs(os.path.dirname(spaced))
+        with open(spaced, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(f'#!/bin/sh\nexec "{sys.executable.replace(os.sep, "/")}" "$@"\n')
+        os.chmod(spaced, 0o755)
+        env["GUARD_PYTHON"] = spaced.replace(os.sep, "/")
+        self.assertEqual(run("git status"), 0)
 
     def test_verify_hook_skips_hook_tests_without_python(self):
         verify = os.path.join(os.path.dirname(HOOK), "verify.sh")
