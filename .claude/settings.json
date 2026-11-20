@@ -47,8 +47,8 @@
       "Bash(git push * --force*)",
       "Bash(git push * -f*)",
       "Bash(git reset --hard*)",
-      "Bash(gh api *merge*)",
-      "Bash(gh api *Merge*)",
+      "Bash(gh api *pulls/*/merge*)",
+      "Bash(gh api *merges*)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Edit(gradle/wrapper/**)"
