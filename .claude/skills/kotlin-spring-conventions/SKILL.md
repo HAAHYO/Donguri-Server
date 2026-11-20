@@ -16,7 +16,7 @@ description: "Donguri(Kotlin 2.3 / Spring Boot 4 / JDK 21) 코드 컨벤션 — 
 | Kotlin | 2.3, `-Xjsr305=strict`, `-Xannotation-default-target=param-property` |
 | Spring Boot | 4.x — `spring-boot-starter-webmvc`, `-validation`, `-actuator` |
 | JSON | Jackson 3 (`tools.jackson.*` 패키지 — `com.fasterxml.jackson` 아님) |
-| 테스트 | JUnit 5, `kotlin-test`, Boot 4 테스트 스타터(`*-test`) |
+| 테스트 | JUnit Jupiter 6 (Boot 4 BOM, `junit-bom` 6.x), `kotlin-test-junit5`, Boot 4 테스트 스타터(`*-test`) |
 
 Boot 4는 자동설정과 테스트 슬라이스가 모듈별로 쪼개져 import 경로가 3.x와 다르다. **import를 기억으로 쓰지 말고 컴파일로 확인한다.** 새 의존성(DB, 보안 등)은 사용자 확인 후 추가한다.
 
