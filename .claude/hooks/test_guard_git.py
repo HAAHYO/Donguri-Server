@@ -105,6 +105,97 @@ class GuardGitTest(unittest.TestCase):
         self.assertEqual(self.run_hook(ok), 0)
         self.assertEqual(self.run_hook(bad), 2)
 
+    # --- QA 라운드 1에서 발견된 우회/오탐 사례 ---
+
+    def test_git_global_options_and_prefixes_do_not_bypass(self):
+        for cmd in [
+            f'git -C {self.repo.replace(os.sep, "/")} commit -m "feat: 추가"',
+            'git -C C:\\no\\such\\dir commit -m "feat: 추가"',
+            'git -C . push origin main',
+            'git -c core.editor=true commit -m "feat: 추가"',
+            'git --no-pager commit -m "feat: 추가"',
+            'GIT_TRACE=1 git commit -m "feat: 추가"',
+            'env FOO=1 git commit -m "feat: 추가"',
+            '(git commit -m "feat: 추가")',
+            'ls & git commit -m "feat: 추가"',
+            'echo x | git commit -F -',
+        ]:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 2)
+
+    def test_gh_api_merge_blocked(self):
+        self.feature_branch()
+        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
+        self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
+        for cmd in [
+            "gh api repos/o/r/pulls/1/merge -X PUT",
+            "gh api -X POST repos/o/r/merges -f base=main -f head=feat/x",
+            "gh api graphql -f query='mutation{mergePullRequest(input:{pullRequestId:\"x\"}){clientMutationId}}'",
+        ]:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 2)
+        self.assertEqual(self.run_hook("gh api repos/o/r/pulls/1/reviews --input p.json"), 0)
+
+    def test_gh_prefixes_do_not_bypass_gates(self):
+        self.feature_branch()
+        self.assertEqual(self.run_hook("GH_TOKEN=x gh pr create --fill"), 2)
+        self.assertEqual(self.run_hook("gh -R o/r pr create --fill"), 2)
+
+    def test_review_marker_must_match_pr_number(self):
+        self.feature_branch()
+        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
+        self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
+        self.assertEqual(self.run_hook("gh pr merge 2 --squash"), 2)
+        self.assertEqual(self.run_hook("gh pr merge --squash"), 0)
+
+    def test_commit_message_forms(self):
+        self.feature_branch()
+        self.assertEqual(self.run_hook('git commit -am "bad subject"'), 2)
+        self.assertEqual(self.run_hook('git commit -m"bad subject"'), 2)
+        self.assertEqual(self.run_hook('git commit --message="bad subject"'), 2)
+        self.assertEqual(self.run_hook('git commit -am "fix: 수정"'), 0)
+        self.assertEqual(self.run_hook('git commit --message="fix: 수정"'), 0)
+        self.assertEqual(self.run_hook('git commit -n -m "fix: 수정"'), 2)
+
+    def test_push_refspec_forms(self):
+        self.feature_branch()
+        for cmd in ["git push origin HEAD:refs/heads/main", 'git push origin "main"', "git push origin +feat/x:main",
+                    "git push origin --delete main", "git push --all origin"]:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 2)
+        sh("git", "switch", "-q", "main", cwd=self.repo)
+        self.assertEqual(self.run_hook("git push origin HEAD --tags"), 2)
+        self.assertEqual(self.run_hook("git push origin --tags"), 0)
+        self.assertEqual(self.run_hook("git push origin v1.0.0"), 0)
+
+    def test_quoted_operators_and_text_are_not_commands(self):
+        self.feature_branch()
+        self.assertEqual(self.run_hook('git commit -m "docs: --no-verify 와 git add . 금지 규칙 문서화"'), 0)
+        self.assertEqual(self.run_hook('git commit -m "fix: a && b 처리"'), 0)
+        self.assertEqual(self.run_hook('echo "git push origin main"'), 0)
+
+    def test_commit_subject_not_taken_from_later_heredoc(self):
+        self.feature_branch()
+        cmd = "git commit -m \"bad subject\" && python - <<'EOF'\nfeat: 이건 커밋 메시지가 아님\nEOF"
+        self.assertEqual(self.run_hook(cmd), 2)
+
+    def test_switch_variants(self):
+        self.assertEqual(self.run_hook('git switch -q -c feat/y && git commit -m "feat: 추가"'), 0)
+        self.assertEqual(self.run_hook('git switch -c feat/y origin/main && git commit -m "feat: 추가"'), 0)
+        self.feature_branch()
+        self.assertEqual(self.run_hook('git switch - && git commit -m "feat: 추가"'), 2)
+        self.assertEqual(self.run_hook('git checkout -- a.kt && git commit -m "feat: 추가"'), 0)
+
+    def test_bulk_add_variants(self):
+        for cmd in ["git add -Av", "git add :/", "git add -u", "git add --all src"]:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 2)
+
+    def test_internal_error_fails_closed(self):
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": self.repo}
+        out = subprocess.run([sys.executable, HOOK], input=b"{not json", env=env, capture_output=True)
+        self.assertEqual(out.returncode, 2)
+
     def test_switch_in_same_command_is_tracked(self):
         self.assertEqual(self.run_hook('git switch -c feat/y && git add a.kt && git commit -m "feat: 추가"'), 0)
         self.feature_branch()

@@ -2,17 +2,21 @@
 
 혼자 하는 프로젝트라 리뷰어가 없으므로, 사람이 지켜줄 규칙을 hook이 대신 지킨다.
 - main 브랜치에서 커밋/푸시 금지 (모든 변경은 PR을 거친다)
-- git add -A / git add . / --no-verify 금지
+- 일괄 스테이징(git add -A / . / -u) 과 hook 우회(--no-verify) 금지
 - 커밋 메시지 컨벤션 검사 (`<type>: <한국어 요약>`)
 - gh pr create: 현재 HEAD에 대한 자가 QA 리포트(PASS)가 있어야 한다
 - gh pr merge: 현재 HEAD에 대한 셀프 리뷰 리포트(필수 0건)도 있어야 한다
+- gh api 로 머지하는 우회 경로 금지
 
-차단 시 exit 2 + stderr 메시지 → Claude에게 그대로 전달된다.
+명령 문자열을 정규식으로 훑지 않고 셸 토큰 단위로 파싱한다. `git -C <path>`, `VAR=x git`,
+`(git ...)`, `a & git ...`, 따옴표 안의 연산자 같은 변형에서 규칙이 빠지지 않게 하기 위해서다.
+차단 시 exit 2 + stderr 메시지 → Claude에게 그대로 전달된다. 내부 오류도 차단(fail closed)한다.
 """
 
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -22,6 +26,21 @@ MAX_SUBJECT = 72
 QA_MARKER_RE = re.compile(r"<!--\s*qa-report\s+head=([0-9a-f]{7,40})\s+verdict=(PASS|FAIL)\s*-->")
 REVIEW_MARKER_RE = re.compile(r"<!--\s*self-review\s+pr=(\d+)\s+head=([0-9a-f]{7,40})\s+required_open=(\d+)\s*-->")
 PROTECTED_BRANCHES = {"main"}
+HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n(.*?)\n[ \t]*\2(?=\s|$|\))", re.S)
+OPERATORS = {"&&", "||", ";", "|", "&", "(", ")", "\n", ";;", "|&"}
+# 값을 별도 토큰으로 받는 전역 옵션
+GIT_GLOBAL_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
+GH_GLOBAL_WITH_ARG = {"-R", "--repo", "--hostname"}
+WRAPPERS = {"command", "env", "exec", "time", "nohup", "builtin"}
+UNKNOWN = object()  # 이 명령 안에서 브랜치가 바뀌었지만 어디로 바뀌었는지 알 수 없음
+
+
+class Blocked(Exception):
+    pass
+
+
+def block(msg):
+    raise Blocked(msg)
 
 
 def git(*args, cwd):
@@ -32,38 +51,111 @@ def git(*args, cwd):
         return ""
 
 
-def block(msg):
-    # Windows 콘솔 코드페이지(cp949)로 인코딩되면 Claude에게 깨진 문자열이 전달된다
-    sys.stderr.buffer.write(f"[guard-git] {msg}\n".encode("utf-8"))
-    sys.stderr.flush()
-    sys.exit(2)
+def tokenize(command):
+    """heredoc 본문을 자리표시자로 바꾸고, 셸 연산자 단위로 명령을 나눈다."""
+    bodies = []
+
+    def stash(m):
+        bodies.append(m.group(3))
+        return f"<<__HEREDOC{len(bodies) - 1}__"
+
+    code = HEREDOC_RE.sub(stash, command)
+    lex = shlex.shlex(code, posix=True, punctuation_chars="();<>|&\n")
+    lex.whitespace = " \t\r"
+    lex.whitespace_split = True
+    lex.commenters = ""
+    try:
+        tokens = list(lex)
+    except ValueError:
+        # 따옴표가 닫히지 않은 명령 — 셸도 실행하지 못하지만, 보수적으로 공백 단위로 나눈다
+        tokens = re.findall(r"&&|\|\||[;|&()\n]|[^\s;|&()]+", code)
+
+    segments, current = [], []
+    for tok in tokens:
+        if tok in OPERATORS:
+            if current:
+                segments.append(current)
+            current = []
+        else:
+            current.append(tok)
+    if current:
+        segments.append(current)
+    return segments, bodies
 
 
-HEREDOC_RE = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n(.*?)\n\s*\1\b", re.S)
+def strip_prefix(seg):
+    """VAR=x, env/command 래퍼를 걷어낸다."""
+    i = 0
+    while i < len(seg):
+        tok = seg[i]
+        if re.match(r"^[A-Za-z_]\w*=", tok) or tok in WRAPPERS or (seg[i - 1:i] == ["env"] and tok.startswith("-")):
+            i += 1
+            continue
+        break
+    return seg[i:]
 
 
-def commit_subject(command, cwd):
-    """커밋 명령에서 제목 줄을 뽑는다. 메시지를 지정하지 않았으면 None."""
-    heredoc = HEREDOC_RE.search(command)
-    if heredoc:
-        lines = [ln.strip() for ln in heredoc.group(2).splitlines() if ln.strip()]
-        return lines[0] if lines else ""
-    m = re.search(r"(?:-m|--message)(?:\s+|=)(\"(?:[^\"\\]|\\.)*\"|'[^']*'|\S+)", command)
+def program(tok):
+    name = re.split(r"[\\/]", tok)[-1].lower()
+    return name[:-4] if name.endswith(".exe") else name
+
+
+def split_globals(args, with_arg):
+    """전역 옵션을 건너뛰고 (옵션 목록, 서브커맨드, 나머지 인자)를 돌려준다."""
+    opts, i = [], 0
+    while i < len(args) and args[i].startswith("-"):
+        opt = args[i]
+        if opt in with_arg and i + 1 < len(args):
+            opts.append((opt, args[i + 1]))
+            i += 2
+        else:
+            opts.append((opt.split("=", 1)[0], opt.split("=", 1)[1] if "=" in opt else None))
+            i += 1
+    if i >= len(args):
+        return opts, None, []
+    return opts, args[i], args[i + 1:]
+
+
+def short_flags(arg):
+    """`-am` 같은 짧은 옵션 묶음이면 문자 집합, 아니면 빈 문자열."""
+    return arg[1:] if re.match(r"^-[A-Za-z]+$", arg) else ""
+
+
+def resolve_message(value, bodies):
+    m = re.search(r"<<__HEREDOC(\d+)__", value)
     if m:
-        value = m.group(1)
-        if value[:1] in "\"'":
-            value = value[1:-1]
-        return value.splitlines()[0].strip() if value.strip() else ""
-    f = re.search(r"(?:-F|--file)(?:\s+|=)(\S+)", command)
-    if f:
-        try:
-            with open(os.path.join(cwd, f.group(1).strip("\"'")), encoding="utf-8") as fh:
-                for ln in fh:
-                    if ln.strip():
-                        return ln.strip()
-        except OSError:
-            return None
-        return ""
+        value = bodies[int(m.group(1))]
+    for ln in value.splitlines():
+        if ln.strip():
+            return ln.strip()
+    return ""
+
+
+def commit_subject(args, bodies, cwd):
+    """커밋 인자에서 제목 줄을 뽑는다. 메시지를 지정하지 않았으면 None."""
+    i = 0
+    while i < len(args):
+        a = args[i]
+        nxt = args[i + 1] if i + 1 < len(args) else ""
+        if a in ("-m", "--message"):
+            return resolve_message(nxt, bodies)
+        if a.startswith("--message="):
+            return resolve_message(a.split("=", 1)[1], bodies)
+        if a in ("-F", "--file") or a.startswith("--file="):
+            path = a.split("=", 1)[1] if "=" in a else nxt
+            if path == "-":
+                return None
+            try:
+                with open(os.path.join(cwd, path), encoding="utf-8") as fh:
+                    return resolve_message(fh.read(), bodies)
+            except OSError:
+                return None
+        if re.match(r"^-[A-Za-z]+", a) and not a.startswith("--") and "m" in a:
+            # -am "msg", -mmsg, -amfix: ...
+            idx = a.index("m")
+            rest = a[idx + 1:]
+            return resolve_message(rest if rest else nxt, bodies)
+        i += 1
     return None
 
 
@@ -79,86 +171,182 @@ def same_sha(a, b):
     return bool(a and b) and (a.startswith(b) or b.startswith(a))
 
 
-def check(command, cwd):
-    # heredoc 본문(커밋 메시지, 파일 내용)은 명령이 아니므로 규칙 검사에서 제외한다.
-    # 여러 명령이 이어진 경우(&&, ;, 줄바꿈)에도 각 부분을 검사한다
-    code = HEREDOC_RE.sub("<<HEREDOC", command)
-    segments = re.split(r"&&|\|\||;|\n", code)
-    branch = git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd)
+def require_qa(cwd):
     head = git("rev-parse", "HEAD", cwd=cwd)
-    workspace = os.path.join(cwd, "_workspace")
+    qa = read_marker(os.path.join(cwd, "_workspace", "qa-report.md"), QA_MARKER_RE)
+    if not qa:
+        block("자가 QA 리포트(_workspace/qa-report.md)가 없습니다. qa-inspector 에이전트로 QA 를 먼저 실행하세요.")
+    if not same_sha(qa.group(1), head):
+        block(f"QA 리포트가 현재 HEAD({head[:7]})가 아니라 {qa.group(1)[:7]} 기준입니다. 바뀐 코드로 QA 를 다시 실행하세요.")
+    if qa.group(2) != "PASS":
+        block("QA 리포트 판정이 FAIL 입니다. BLOCKER 를 고치고 QA 를 다시 실행하세요.")
+    return head
 
-    for seg in segments:
-        s = seg.strip()
 
-        # 같은 명령 안에서 먼저 브랜치를 바꾼 경우 이후 부분은 그 브랜치 기준으로 검사한다
-        switched = re.match(r"git\s+(?:switch\s+(?:-c|-C|--create)|checkout\s+-[bB]|switch|checkout)\s+([\w./-]+)\s*$", s)
-        if switched:
-            branch = switched.group(1)
-            continue
+def require_review(cwd, head, pr_number):
+    rv = read_marker(os.path.join(cwd, "_workspace", "review-report.md"), REVIEW_MARKER_RE)
+    if not rv:
+        block("셀프 리뷰 리포트(_workspace/review-report.md)가 없습니다. pr-reviewer 에이전트로 리뷰를 먼저 받으세요.")
+    if pr_number and rv.group(1) != pr_number:
+        block(f"셀프 리뷰 리포트는 PR #{rv.group(1)} 기준입니다. PR #{pr_number} 에 대한 리뷰가 필요합니다.")
+    if not same_sha(rv.group(2), head):
+        block(f"셀프 리뷰가 현재 HEAD({head[:7]})가 아니라 {rv.group(2)[:7]} 기준입니다. 반영 커밋 이후 재리뷰가 필요합니다.")
+    if int(rv.group(3)) > 0:
+        block(f"셀프 리뷰의 (필수) 코멘트가 {rv.group(3)}건 남아 있습니다. 반영하거나 사유를 남긴 뒤 재리뷰하세요.")
 
-        if re.match(r"git\s", s) and re.search(r"\s--no-verify\b", s):
-            block("--no-verify 는 금지입니다. hook이 실패하면 원인을 고치세요.")
 
-        if re.match(r"git\s+add\b", s) and re.search(r"\s(-A|--all|\.)(\s|$)", s):
-            block("git add -A / git add . 는 금지입니다. 커밋 단위별로 경로를 지정해 스테이징하세요.")
+def check_git(opts, sub, args, state, bodies):
+    cwd = state["cwd"]
+    for opt, val in opts:
+        if opt == "-C" and val:
+            cwd = os.path.normpath(os.path.join(cwd, val))
+    branch = state["branch"].get(cwd)
+    if branch is None:
+        branch = git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd) if os.path.isdir(cwd) else ""
+        if not branch:
+            # -C 경로를 해석할 수 없으면 프로젝트 저장소 기준으로 판단한다 (규칙이 빠지는 쪽보다 낫다)
+            cwd = state["cwd"]
+            branch = state["branch"].get(cwd) or git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd)
+        state["branch"][cwd] = branch
 
-        if re.match(r"git\s+commit\b", s):
-            if branch in PROTECTED_BRANCHES:
-                block(f"'{branch}' 브랜치에 직접 커밋할 수 없습니다. `git switch -c feat/<주제>` 로 브랜치를 먼저 만드세요.")
-            if "--amend" in s and "--no-edit" in s:
+    if "--no-verify" in args:
+        block("--no-verify 는 금지입니다. hook 이 실패하면 원인을 고치세요.")
+
+    if sub in ("switch", "checkout"):
+        create = None
+        positional = []
+        i = 0
+        while i < len(args):
+            a = args[i]
+            if a in ("-c", "-C", "--create", "--force-create", "-b", "-B", "--orphan") and i + 1 < len(args):
+                create = args[i + 1]
+                i += 2
                 continue
-            # 원본 명령에서 이 커밋에 해당하는 위치부터 메시지를 찾는다 (한 명령에 커밋이 여러 개일 수 있음)
-            starts = [m.start() for m in re.finditer(r"git\s+commit\b", command)]
-            nth = sum(1 for prev in segments[: segments.index(seg)] if re.match(r"\s*git\s+commit\b", prev))
-            start = starts[nth] if nth < len(starts) else 0
-            end = starts[nth + 1] if nth + 1 < len(starts) else len(command)
-            subject = commit_subject(command[start:end], cwd)
-            if subject is None:
-                continue
-            if not SUBJECT_RE.match(subject):
-                block(
-                    f"커밋 제목 '{subject}' 이(가) 컨벤션에 맞지 않습니다. "
-                    f"형식: `<type>: <한국어 요약>` (type: {COMMIT_TYPES.replace('|', ', ')})"
-                )
-            if len(subject) > MAX_SUBJECT:
-                block(f"커밋 제목이 {len(subject)}자입니다({MAX_SUBJECT}자 이하). 커밋을 더 작게 나누세요.")
+            if a == "--":
+                break
+            if not a.startswith("-") or a == "-":
+                positional.append(a)
+            i += 1
+        if create:
+            state["branch"][cwd] = create
+        elif positional:
+            target = positional[0]
+            if target == "-" or "--detach" in args:
+                state["branch"][cwd] = UNKNOWN
+            elif sub == "switch" or git("rev-parse", "--verify", "--quiet", f"refs/heads/{target}", cwd=cwd):
+                state["branch"][cwd] = target
+        return
 
-        if re.match(r"git\s+push\b", s):
-            targets = re.findall(r"(?:^|\s|:)(main)(?:\s|$)", s.split("push", 1)[1])
-            if targets or (branch in PROTECTED_BRANCHES and not re.search(r"\s(--tags|v\d)", s)):
+    if sub == "add":
+        for a in args:
+            if a in ("-A", "--all", "-u", "--update", ".", ":/", ":", "*", "./") or re.match(r"^-[A-Za-z]*[Au][A-Za-z]*$", a):
+                block("일괄 스테이징(git add -A / . / -u)은 금지입니다. 커밋 단위별로 경로를 지정해 스테이징하세요.")
+        return
+
+    if sub == "commit":
+        if any("n" in short_flags(a) for a in args):
+            block("git commit -n(--no-verify)은 금지입니다.")
+        if branch is UNKNOWN:
+            block("같은 명령 안에서 브랜치를 바꾼 뒤 커밋하고 있어 대상 브랜치를 알 수 없습니다. 명령을 나눠 실행하세요.")
+        if branch in PROTECTED_BRANCHES:
+            block(f"'{branch}' 브랜치에 직접 커밋할 수 없습니다. `git switch -c feat/<주제>` 로 브랜치를 먼저 만드세요.")
+        if "--amend" in args and "--no-edit" in args:
+            return
+        subject = commit_subject(args, bodies, cwd)
+        if subject is None:
+            return
+        if not SUBJECT_RE.match(subject):
+            block(f"커밋 제목 '{subject}' 이(가) 컨벤션에 맞지 않습니다. 형식: `<type>: <한국어 요약>` (type: {COMMIT_TYPES.replace('|', ', ')})")
+        if len(subject) > MAX_SUBJECT:
+            block(f"커밋 제목이 {len(subject)}자입니다({MAX_SUBJECT}자 이하). 커밋을 더 작게 나누세요.")
+        return
+
+    if sub == "push":
+        if any(a in ("--all", "--mirror") for a in args):
+            block("git push --all / --mirror 는 main 을 포함하므로 금지입니다. 브랜치를 지정해 푸시하세요.")
+        positional, i = [], 0
+        while i < len(args):
+            a = args[i]
+            if a in ("-o", "--push-option", "--repo", "--receive-pack", "--exec") and i + 1 < len(args):
+                i += 2
+                continue
+            if not a.startswith("-"):
+                positional.append(a)
+            i += 1
+        refspecs = positional[1:]
+        tags_only = "--tags" in args or "--follow-tags" in args
+        if not refspecs:
+            if tags_only and "--follow-tags" not in args:
+                return
+            if branch is UNKNOWN or branch in PROTECTED_BRANCHES:
+                block("main 에 직접 푸시할 수 없습니다. 기능 브랜치를 푸시하고 PR 을 여세요.")
+            return
+        for spec in refspecs:
+            spec = spec.lstrip("+")
+            dst = spec.split(":", 1)[1] if ":" in spec else spec
+            if dst in ("HEAD", "@"):
+                dst = branch
+            if dst is UNKNOWN:
+                block("푸시 대상 브랜치를 알 수 없습니다. 명령을 나눠 실행하세요.")
+            dst = re.sub(r"^refs/heads/", "", dst or "")
+            if dst in PROTECTED_BRANCHES:
                 block("main 에 직접 푸시할 수 없습니다. 기능 브랜치를 푸시하고 PR 을 여세요.")
 
-        if re.match(r"gh\s+pr\s+(create|merge)\b", s):
-            qa = read_marker(os.path.join(workspace, "qa-report.md"), QA_MARKER_RE)
-            if not qa:
-                block("자가 QA 리포트(_workspace/qa-report.md)가 없습니다. qa-inspector 에이전트로 QA 를 먼저 실행하세요.")
-            if not same_sha(qa.group(1), head):
-                block(f"QA 리포트가 현재 HEAD({head[:7]})가 아니라 {qa.group(1)[:7]} 기준입니다. 바뀐 코드로 QA 를 다시 실행하세요.")
-            if qa.group(2) != "PASS":
-                block("QA 리포트 판정이 FAIL 입니다. BLOCKER 를 고치고 QA 를 다시 실행하세요.")
 
-        if re.match(r"gh\s+pr\s+merge\b", s):
-            rv = read_marker(os.path.join(workspace, "review-report.md"), REVIEW_MARKER_RE)
-            if not rv:
-                block("셀프 리뷰 리포트(_workspace/review-report.md)가 없습니다. pr-reviewer 에이전트로 리뷰를 먼저 받으세요.")
-            if not same_sha(rv.group(2), head):
-                block(f"셀프 리뷰가 현재 HEAD({head[:7]})가 아니라 {rv.group(2)[:7]} 기준입니다. 반영 커밋 이후 재리뷰가 필요합니다.")
-            if int(rv.group(3)) > 0:
-                block(f"셀프 리뷰의 (필수) 코멘트가 {rv.group(3)}건 남아 있습니다. 반영하거나 사유를 남긴 뒤 재리뷰하세요.")
+def check_gh(sub, args, state):
+    cwd = state["cwd"]
+    if sub == "api":
+        joined = " ".join(args)
+        if re.search(r"/pulls/\d+/merge\b|/merges\b|mergePullRequest|enablePullRequestAutoMerge|mergeBranch", joined):
+            block("gh api 로 머지하는 것은 금지입니다. 셀프 리뷰 게이트를 거치도록 `gh pr merge` 를 사용하세요.")
+        return
+    if sub != "pr" or not args:
+        return
+    action = args[0]
+    if action in ("create", "new"):
+        require_qa(cwd)
+    elif action == "merge":
+        head = require_qa(cwd)
+        number = next((a.lstrip("#") for a in args[1:] if re.match(r"^#?\d+$", a)), None)
+        require_review(cwd, head, number)
+
+
+def check(command, cwd):
+    segments, bodies = tokenize(command)
+    state = {"cwd": cwd, "branch": {}}
+    for seg in segments:
+        seg = strip_prefix(seg)
+        if not seg:
+            continue
+        prog = program(seg[0])
+        if prog == "git":
+            opts, sub, args = split_globals(seg[1:], GIT_GLOBAL_WITH_ARG)
+            if sub:
+                check_git(opts, sub, args, state, bodies)
+        elif prog == "gh":
+            _, sub, args = split_globals(seg[1:], GH_GLOBAL_WITH_ARG)
+            if sub:
+                check_gh(sub, args, state)
 
 
 def main():
     try:
         payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
-    except (ValueError, UnicodeDecodeError):
-        return
-    command = (payload.get("tool_input") or {}).get("command") or ""
-    if not re.search(r"\b(git|gh)\b", command):
-        return
-    cwd = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd()
-    check(command, cwd)
+        command = (payload.get("tool_input") or {}).get("command") or ""
+        if not re.search(r"\b(git|gh)\b", command):
+            return 0
+        cwd = os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or os.getcwd()
+        check(command, cwd)
+        return 0
+    except Blocked as e:
+        msg = str(e)
+    except Exception as e:  # noqa: BLE001 — 가드가 조용히 꺼지는 것보다 막는 편이 낫다
+        msg = f"hook 내부 오류로 명령을 차단했습니다({type(e).__name__}: {e}). .claude/hooks/guard_git.py 를 확인하세요."
+    # Windows 콘솔 코드페이지(cp949)로 인코딩되면 Claude에게 깨진 문자열이 전달된다
+    sys.stderr.buffer.write(f"[guard-git] {msg}\n".encode("utf-8"))
+    sys.stderr.flush()
+    return 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
