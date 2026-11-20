@@ -14,7 +14,9 @@ description: "Donguri(Kotlin 2.3 / Spring Boot 4 / JDK 21) 코드 컨벤션 — 
 | 항목 | 값 |
 |------|-----|
 | Kotlin | 2.3, `-Xjsr305=strict`, `-Xannotation-default-target=param-property` |
-| Spring Boot | 4.x — `spring-boot-starter-webmvc`, `-validation`, `-actuator` |
+| Spring Boot | 4.x — `spring-boot-starter-webmvc`, `-validation`, `-actuator`, `-data-jpa` |
+| DB | MySQL 8 (`mysql-connector-j`), 테스트·스모크는 H2 MySQL 모드. 접속 정보는 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` 환경변수 |
+| API 문서 | springdoc-openapi 3.x (`/swagger-ui.html`, `/v3/api-docs`) |
 | JSON | Jackson 3 (`tools.jackson.*` 패키지 — `com.fasterxml.jackson` 아님) |
 | 테스트 | JUnit Jupiter 6 (Boot 4 BOM, `junit-bom` 6.x), `kotlin-test-junit5`, Boot 4 테스트 스타터(`*-test`) |
 
@@ -28,10 +30,12 @@ com.donguri
 │   ├── <Domain>Controller.kt
 │   ├── <Domain>Service.kt
 │   ├── <Domain>.kt           도메인 모델/엔티티
-│   ├── <Domain>Repository.kt (영속성 도입 후)
+│   ├── <Domain>Repository.kt JpaRepository. Enum 은 타입마다 별도 파일 (예: EmployeeRole.kt, FdsStatus.kt)
 │   ├── <Domain>Exception.kt
 │   └── dto/                  <Action>Request.kt, <Domain>Response.kt
 └── global/
+    ├── entity/               BaseTimeEntity (createdAt/updatedAt, Hibernate 자동 기록)
+    ├── init/                 DataInitializer (local 프로필 시딩)
     ├── error/                ErrorCode, DonguriException, GlobalExceptionHandler
     └── config/
 ```
@@ -81,3 +85,14 @@ class AcornNotFoundException : DonguriException(ErrorCode.ACORN_NOT_FOUND)
 
 - `application.properties` 에 비밀값을 넣지 않는다 — `${ENV_NAME}` 참조 + GitHub Secrets.
 - 새 필수 설정은 CD 환경에도 있어야 부팅된다. 추가하면 PR 본문에 명시한다.
+
+## JPA 엔티티
+
+- 생성자 프로퍼티로 필수 값을 받고, 식별자는 본문의 `@Id @GeneratedValue(strategy = IDENTITY) val id: Long? = null`.
+- `kotlin("plugin.jpa")` + allOpen(`Entity`, `MappedSuperclass`, `Embeddable`)이 설정돼 있다 — `open` 을 직접 쓰지 않는다.
+- 연관관계는 모두 `FetchType.LAZY`, 금액은 `BigDecimal` + `precision/scale` 명시.
+- Enum 은 `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.VARCHAR)`. 없으면 MySQL 네이티브 `enum(...)` 컬럼이 생겨, 상수를 추가해도 `ddl-auto: update` 가 컬럼을 바꾸지 않아 새 값 저장이 실패한다.
+  - 그래도 Hibernate 는 허용 값 CHECK 제약(`col in ('A','B')`)을 만든다(`AttributeConverter` 를 써도 동일, Hibernate 7). `ddl-auto: update` 는 이 제약을 고치지 않는다. **Enum 상수를 추가하면 같은 PR 에서 기존 DB 의 CHECK 제약을 바꾸는 SQL 을 PR 본문에 적는다** — 마이그레이션 도구(Flyway) 도입 전까지의 규칙.
+- 엔티티를 컨트롤러 응답으로 반환하지 않는다(위 레이어 역할). `open-in-view` 는 꺼져 있으므로 지연 로딩은 서비스의 트랜잭션 안에서 끝낸다.
+- 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`) + `@AutoConfigureTestDatabase(replace = NONE)` + `@ActiveProfiles("test")` — 임의 내장 DB 가 아니라 test 프로필의 H2 MySQL 모드로 검증한다.
+- `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
