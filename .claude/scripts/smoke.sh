@@ -44,8 +44,10 @@ stop_app() {
 trap stop_app EXIT
 
 up=0
-for _ in $(seq 1 150); do
-  if curl -sf -o /dev/null "${BASE}/actuator/health"; then up=1; break; fi
+# 반복 횟수가 아니라 경과 시간으로 제한한다 (Windows 에서 연결 거부 시 curl 한 번이 수 초 걸릴 수 있음)
+deadline=$((SECONDS + 150))
+while [ "$SECONDS" -lt "$deadline" ]; do
+  if curl -sf -o /dev/null --connect-timeout 1 --max-time 2 "${BASE}/actuator/health"; then up=1; break; fi
   kill -0 "$PID" 2>/dev/null || break
   sleep 1
 done
