@@ -16,7 +16,8 @@ description: "Donguri(Kotlin 2.3 / Spring Boot 4 / JDK 21) 코드 컨벤션 — 
 | Kotlin | 2.3, `-Xjsr305=strict`, `-Xannotation-default-target=param-property` |
 | Spring Boot | 4.x — `spring-boot-starter-webmvc`, `-validation`, `-actuator`, `-data-jpa` |
 | DB | MySQL 8 (`mysql-connector-j`), 테스트·스모크는 H2 MySQL 모드. 접속 정보는 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` 환경변수 |
-| API 문서 | springdoc-openapi 3.x (`/swagger-ui.html`, `/v3/api-docs`) |
+| API 문서 | springdoc-openapi 3.x (`/swagger-ui.html`, `/v3/api-docs`), 전역 Bearer JWT 스키마 |
+| 보안 | Spring Security + jjwt 0.13 (HS256, `JWT_SECRET`), Stateless, `@EnableMethodSecurity` |
 | JSON | Jackson 3 (`tools.jackson.*` 패키지 — `com.fasterxml.jackson` 아님) |
 | 테스트 | JUnit Jupiter 6 (Boot 4 BOM, `junit-bom` 6.x), `kotlin-test-junit5`, Boot 4 테스트 스타터(`*-test`) |
 
@@ -36,6 +37,8 @@ com.donguri
 └── global/
     ├── entity/               BaseTimeEntity (createdAt/updatedAt, Hibernate 자동 기록)
     ├── init/                 DataInitializer (local 프로필 시딩)
+    ├── security/             SecurityConfig, JwtTokenProvider, JwtAuthenticationFilter
+    ├── util/                 MaskingUtil
     ├── error/                ErrorCode, DonguriException, GlobalExceptionHandler
     └── config/
 ```
@@ -96,3 +99,12 @@ class AcornNotFoundException : DonguriException(ErrorCode.ACORN_NOT_FOUND)
 - 엔티티를 컨트롤러 응답으로 반환하지 않는다(위 레이어 역할). `open-in-view` 는 꺼져 있으므로 지연 로딩은 서비스의 트랜잭션 안에서 끝낸다.
 - 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`) + `@AutoConfigureTestDatabase(replace = NONE)` + `@ActiveProfiles("test")` — 임의 내장 DB 가 아니라 test 프로필의 H2 MySQL 모드로 검증한다.
 - `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
+
+## 보안
+
+- 허용 경로는 `SecurityConfig` 에 명시한 것(`POST /api/auth/login`, health, swagger, `/error`)뿐이고 나머지는 인증이 필요하다. 새 공개 경로는 그 목록에 추가하고 테스트한다.
+- 역할 제한은 컨트롤러 메서드의 `@PreAuthorize("hasRole('FDS_ADMIN')")`. 권한 이름은 `ROLE_` + `EmployeeRole` 이름.
+- 현재 사용자는 `SecurityContextHolder` 의 principal `JwtPrincipal`(username, role).
+- 401/403 도 `ErrorCode.UNAUTHORIZED`/`ACCESS_DENIED` ProblemDetail 로 응답한다(`HandlerExceptionResolver` 위임).
+- 고객 이름·계좌번호를 응답에 담을 때는 `MaskingUtil.name`/`accountNumber` 를 거친다(FDS_ADMIN 만 원본).
+- 보안 테스트는 `@SpringBootTest` + `@AutoConfigureMockMvc`(`org.springframework.boot.webmvc.test.autoconfigure`)로 상태 코드와 `code` 를 단언한다.

@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.context.annotation.Profile
-import org.springframework.security.crypto.factory.PasswordEncoderFactories
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -26,10 +26,10 @@ class DataInitializer(
     private val employeeRepository: EmployeeRepository,
     private val customerRepository: CustomerRepository,
     private val transactionRepository: TransactionRepository,
+    private val passwordEncoder: PasswordEncoder,
     @Value("\${fds.seed.employee-password:}") private val seedPassword: String,
 ) : ApplicationRunner {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder()
 
     @Transactional
     override fun run(args: ApplicationArguments) {

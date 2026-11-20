@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.security.crypto.factory.PasswordEncoderFactories
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.json.JsonMapper
@@ -24,6 +24,7 @@ class DataInitializerTest(
     @Autowired private val employeeRepository: EmployeeRepository,
     @Autowired private val customerRepository: CustomerRepository,
     @Autowired private val transactionRepository: TransactionRepository,
+    @Autowired private val passwordEncoder: PasswordEncoder,
 ) {
     @Test
     fun `빈 DB 로 기동하면 직원 2명, 고객 10명, 거래 15건이 저장된다`() {
@@ -43,11 +44,9 @@ class DataInitializerTest(
 
     @Test
     fun `직원 비밀번호는 평문이 아니라 설정된 시드 비밀번호의 bcrypt 해시로 저장된다`() {
-        val encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder()
-
         employeeRepository.findAll().forEach {
             assertTrue(it.password.startsWith("{bcrypt}"), "${it.username} 비밀번호가 bcrypt 해시가 아니다")
-            assertTrue(encoder.matches("test-seed-password", it.password))
+            assertTrue(passwordEncoder.matches("test-seed-password", it.password))
         }
     }
 
