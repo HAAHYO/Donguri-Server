@@ -5,6 +5,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,12 +28,19 @@ class GuardGitTest(unittest.TestCase):
             ["git", "rev-parse", "HEAD"], cwd=self.repo, capture_output=True, text=True, check=True
         ).stdout.strip()
         os.makedirs(os.path.join(self.repo, "_workspace"))
+        # gh pr view 대체: 선택자(번호/브랜치/current) → PR 정보
+        pr = lambda n, head, base: {"number": n, "headRefName": head, "baseRefName": base, "headRefOid": self.head}  # noqa: E731
+        self.prs = {"1": pr(1, "feat/x", "develop"), "current": pr(1, "feat/x", "develop"),
+                    "2": pr(2, "feat/y", "develop"), "3": pr(3, "feat/z", "main"), "4": pr(4, "develop", "main")}
+        self.pr_json = os.path.join(self.tmp.name, "prs.json")
+        with open(self.pr_json, "w", encoding="utf-8") as fh:
+            json.dump(self.prs, fh)
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def run_hook(self, command):
-        env = {**os.environ, "CLAUDE_PROJECT_DIR": self.repo}
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": self.repo, "GUARD_TEST_PR_JSON": self.pr_json}
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}).encode("utf-8")
         return subprocess.run([sys.executable, HOOK], input=payload, env=env, capture_output=True).returncode
 
@@ -275,6 +283,66 @@ class GuardGitTest(unittest.TestCase):
         self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
         self.assertEqual(self.run_hook("gh pr merge https://github.com/o/r/pull/2"), 2)
         self.assertEqual(self.run_hook("gh pr merge https://github.com/o/r/pull/1"), 0)
+
+    # --- QA 라운드 3에서 발견된 우회/오탐 사례 ---
+
+    def test_merge_checks_pr_base_against_strategy(self):
+        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
+        self.write("review-report.md", f"<!-- self-review pr=3 head={self.head} required_open=0 -->\n")
+        self.assertEqual(self.run_hook("gh pr merge 3"), 2)  # feat/z → main
+        self.write("review-report.md", f"<!-- self-review pr=4 head={self.head} required_open=0 -->\n")
+        self.assertEqual(self.run_hook("gh pr merge 4"), 0)  # 릴리스 develop → main
+
+    def test_pr_edit_base_follows_strategy(self):
+        self.assertEqual(self.run_hook("gh pr edit 1 --base main"), 2)
+        self.assertEqual(self.run_hook("gh pr edit 1 --base develop"), 0)
+        self.assertEqual(self.run_hook("gh pr edit 1 --title 'chore: 제목'"), 0)
+        self.assertEqual(self.run_hook("gh api -X PATCH repos/o/r/pulls/1 -f base=main"), 2)
+
+    def test_repo_settings_changes_blocked(self):
+        self.assertEqual(self.run_hook("gh api -X DELETE repos/o/r/branches/main/protection"), 2)
+        self.assertEqual(self.run_hook("gh api -X PATCH repos/o/r -f default_branch=main"), 2)
+        self.assertEqual(self.run_hook("gh api repos/o/r/branches/main/protection"), 0)
+
+    def test_graphql_commas_do_not_hide_mutations(self):
+        q = "mutation{resolveReviewThread(input:{threadId:\"x\"}){thread{id}},updateRef,(input:{refId:\"r\",oid:\"o\"}){clientMutationId}}"
+        self.assertEqual(self.run_hook(f"gh api graphql -f query='{q}'"), 2)
+
+    def test_pr_create_respects_head_option(self):
+        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
+        self.feature_branch()
+        self.assertEqual(self.run_hook("gh pr create --base develop --head feat/x --fill"), 0)
+        self.assertEqual(self.run_hook("gh pr create --base main --head develop --fill"), 2)  # 현재 브랜치 아님
+
+    def test_runner_wrappers_checked(self):
+        for cmd in ["nice -n 5 git commit -m 'feat: 추가'", "timeout 30s git push origin main",
+                    "echo x | xargs -0 git commit -m 'feat: 추가'", "bash -lc 'git push origin main'",
+                    "bash <<'EOF'\ngit push origin main\nEOF"]:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 2)
+
+    def test_local_history_changes_on_protected_branch_blocked(self):
+        for cmd in ["git merge feat/x", "git cherry-pick abc123", "git revert HEAD", "git rebase feat/x"]:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 2)
+        self.assertEqual(self.run_hook("git merge --ff-only origin/main"), 0)
+        self.assertEqual(self.run_hook("git pull"), 0)
+
+    def test_wrapper_without_python_blocks_only_git(self):
+        wrapper = os.path.join(os.path.dirname(HOOK), "guard-git.sh")
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": self.repo, "GUARD_PYTHON": "no-such-python"}
+
+        def run(cmd):
+            payload = json.dumps({"tool_input": {"command": cmd}}).encode("utf-8")
+            # Windows 의 CreateProcess 는 PATH 보다 System32(WSL bash)를 먼저 찾으므로 PATH 순서로 직접 찾는다
+            bash = shutil.which("bash") or "bash"
+            return subprocess.run([bash, wrapper], input=payload, env=env, capture_output=True).returncode
+
+        self.assertEqual(run("ls -la"), 0)
+        self.assertEqual(run("git status"), 2)
+        env["GUARD_PYTHON"] = sys.executable
+        self.assertEqual(run("git add ."), 2)
+        self.assertEqual(run("git status"), 0)
 
     def test_heredoc_delimiter_with_dash(self):
         self.feature_branch()

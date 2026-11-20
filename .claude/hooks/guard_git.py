@@ -39,6 +39,10 @@ GH_GLOBAL_WITH_ARG = {"-R", "--repo", "--hostname"}
 WRAPPERS = {"command", "env", "exec", "time", "nohup", "builtin", "sudo", "{", "}", "!", "if", "then", "else", "elif",
             "do", "while", "until", "fi", "done"}
 SHELLS = {"bash", "sh", "zsh", "dash"}
+# 뒤에 오는 명령을 실행하는 래퍼 (옵션은 건너뛴다). timeout 은 기간 인자를 하나 더 받는다
+RUNNERS = {"nice", "ionice", "stdbuf", "xargs", "timeout", "nohup", "chronic", "unbuffer"}
+RUNNER_OPTS_WITH_ARG = {"-n", "-c", "-p", "-I", "-i", "-o", "-e", "-d", "-P", "-L", "-s", "-a", "-E", "-k", "--signal",
+                        "--kill-after", "--adjustment", "--max-args", "--max-procs", "--delimiter", "--arg-file"}
 # gh api graphql 에서 허용하는 mutation (리뷰 스레드 답글/해결만)
 ALLOWED_MUTATIONS = {"resolveReviewThread", "unresolveReviewThread", "addPullRequestReviewThreadReply"}
 UNKNOWN = object()  # 이 명령 안에서 브랜치가 바뀌었지만 어디로 바뀌었는지 알 수 없음
@@ -100,6 +104,14 @@ def strip_prefix(seg):
         prev = seg[i - 1] if i else ""
         if re.match(r"^[A-Za-z_]\w*=", tok) or tok in WRAPPERS or (prev in ("env", "time", "sudo") and tok.startswith("-")):
             i += 1
+            continue
+        if program(tok) in RUNNERS:
+            runner = program(tok)
+            i += 1
+            while i < len(seg) and seg[i].startswith("-"):
+                i += 2 if seg[i] in RUNNER_OPTS_WITH_ARG else 1
+            if runner == "timeout" and i < len(seg):
+                i += 1  # 기간 (예: 30s)
             continue
         break
     return seg[i:]
@@ -185,8 +197,33 @@ def same_sha(a, b):
     return bool(a and b) and (a.startswith(b) or b.startswith(a))
 
 
-def require_qa(cwd):
-    head = git("rev-parse", "HEAD", cwd=cwd)
+def expected_base(head_branch):
+    return RELEASE_BRANCH if head_branch == INTEGRATION_BRANCH else INTEGRATION_BRANCH
+
+
+def strategy_msg():
+    return f"(기능 → {INTEGRATION_BRANCH}, 릴리스 {INTEGRATION_BRANCH} → {RELEASE_BRANCH})"
+
+
+def pr_info(selector, cwd):
+    """gh pr view 로 PR 의 번호/base/head/head SHA 를 조회한다. 조회 실패 시 None.
+
+    테스트에서는 GUARD_TEST_PR_JSON (선택자 → PR 정보 JSON 파일)로 대체한다.
+    """
+    fake = os.environ.get("GUARD_TEST_PR_JSON")
+    if fake:
+        with open(fake, encoding="utf-8") as fh:
+            return json.load(fh).get(selector or "current")
+    cmd = ["gh", "pr", "view", *([selector] if selector else []), "--json", "number,baseRefName,headRefName,headRefOid"]
+    try:
+        out = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", timeout=20)
+        return json.loads(out.stdout) if out.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def require_qa(cwd, head=None):
+    head = head or git("rev-parse", "HEAD", cwd=cwd)
     qa = read_marker(os.path.join(cwd, "_workspace", "qa-report.md"), QA_MARKER_RE)
     if not qa:
         block("자가 QA 리포트(_workspace/qa-report.md)가 없습니다. qa-inspector 에이전트로 QA 를 먼저 실행하세요.")
@@ -251,6 +288,10 @@ def check_git(opts, sub, args, state, bodies):
             elif sub == "switch" or git("rev-parse", "--verify", "--quiet", f"refs/heads/{target}", cwd=cwd):
                 state["branch"][cwd] = target
         return
+
+    if sub in ("merge", "cherry-pick", "revert", "am", "rebase") and branch in PROTECTED_BRANCHES:
+        if not (sub == "merge" and "--ff-only" in args):
+            block(f"'{branch}' 브랜치에서 로컬 {sub} 는 금지입니다. 기능 브랜치에서 작업하고 PR 로 반영하세요.")
 
     if sub == "add":
         for a in args:
@@ -361,7 +402,8 @@ def check_gh_api(args, bodies):
                 block("gh api graphql 쿼리는 파일/치환이 아니라 명령에 직접 써야 검사할 수 있습니다.")
             if re.search(r"\bmutation\b", q):
                 # 인자를 받는 모든 필드 이름을 허용 목록과 대조한다 (작업 이름 `mutation Foo(...)` 는 제외)
-                names = set(re.findall(r"(\w+)\s*\(", re.sub(r"\bmutation\b\s*\w*", "", q)))
+                # GraphQL 은 쉼표를 공백으로 취급한다 (`updateRef,(...)` 도 유효)
+                names = set(re.findall(r"(\w+)\s*\(", re.sub(r"\bmutation\b\s*\w*", "", q.replace(",", " "))))
                 bad = names - ALLOWED_MUTATIONS
                 if not names or bad:
                     block(f"허용되지 않은 GraphQL mutation 입니다({', '.join(sorted(bad)) or '알 수 없음'}). "
@@ -369,8 +411,14 @@ def check_gh_api(args, bodies):
         return
 
     path = endpoint.split("?", 1)[0]
-    if re.search(r"/pulls/\d+/merge\b|/merges\b|/git/refs\b|/git/commits\b|/contents/|/pulls/\d+/update-branch", path) and method != "GET":
+    if method == "GET":
+        return
+    if re.search(r"/pulls/\d+/merge\b|/merges\b|/git/refs\b|/git/commits\b|/contents/|/pulls/\d+/update-branch", path):
         block(gate_msg)
+    if re.search(r"/pulls/\d+$", path) and any(f.startswith("base=") for f in fields):
+        block(f"gh api 로 PR base 를 바꾸는 것은 금지입니다. `gh pr edit --base` 를 사용하세요 {strategy_msg()}.")
+    if re.search(r"/branches/[^/]+/protection|/rulesets", path) or re.fullmatch(r"repos/[^/]+/[^/]+", path.strip("/")):
+        block("브랜치 보호·저장소 설정 변경은 사용자가 결정할 일입니다. 필요하면 사용자에게 `! gh api ...` 로 직접 실행을 요청하세요.")
 
 
 def check_gh(sub, args, state, bodies):
@@ -381,24 +429,43 @@ def check_gh(sub, args, state, bodies):
     if sub != "pr" or not args:
         return
     action, rest = args[0], args[1:]
+    # 위치 인자: PR 번호, URL, 브랜치 이름
+    selector = next((a for a in rest if not a.startswith("-")), None)
+    if selector:
+        m = re.match(r"^#?(\d+)$", selector) or re.search(r"/pull/(\d+)", selector)
+        selector = m.group(1) if m else selector
+
     if action in ("create", "new"):
-        branch = git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd)
+        heads = option_values(rest, ["-H", "--head"])
+        head_branch = heads[-1].split(":")[-1] if heads else git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd)
         bases = option_values(rest, ["-B", "--base"])
-        expected = RELEASE_BRANCH if branch == INTEGRATION_BRANCH else INTEGRATION_BRANCH
+        expected = expected_base(head_branch)
         if not bases:
-            block(f"gh pr create 에 --base {expected} 를 명시하세요 (기능 → {INTEGRATION_BRANCH}, 릴리스 {INTEGRATION_BRANCH} → {RELEASE_BRANCH}).")
+            block(f"gh pr create 에 --base {expected} 를 명시하세요 {strategy_msg()}.")
         if bases[-1] != expected:
-            block(f"'{branch}' 의 PR base 는 {expected} 여야 합니다 (기능 → {INTEGRATION_BRANCH}, 릴리스 {INTEGRATION_BRANCH} → {RELEASE_BRANCH}).")
+            block(f"'{head_branch}' 의 PR base 는 {expected} 여야 합니다 {strategy_msg()}.")
+        if heads and head_branch != git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd):
+            block(f"--head {head_branch} 는 현재 브랜치가 아닙니다. QA 리포트는 현재 HEAD 기준이므로 해당 브랜치로 전환해 PR 을 여세요.")
         require_qa(cwd)
+
+    elif action == "edit":
+        bases = option_values(rest, ["-B", "--base"])
+        if bases:
+            pr = pr_info(selector, cwd)
+            if not pr:
+                block("PR 정보를 조회할 수 없어 base 변경을 검사할 수 없습니다.")
+            if bases[-1] != expected_base(pr["headRefName"]):
+                block(f"PR #{pr['number']}({pr['headRefName']}) 의 base 는 {expected_base(pr['headRefName'])} 여야 합니다 {strategy_msg()}.")
+
     elif action == "merge":
-        head = require_qa(cwd)
-        number = None
-        for a in rest:
-            m = re.match(r"^#?(\d+)$", a) or re.search(r"/pull/(\d+)", a)
-            if m:
-                number = m.group(1)
-                break
-        require_review(cwd, head, number)
+        pr = pr_info(selector, cwd)
+        if not pr:
+            block("머지할 PR 정보를 조회할 수 없어 게이트를 검사할 수 없습니다. PR 번호를 지정하세요.")
+        if pr["baseRefName"] != expected_base(pr["headRefName"]):
+            block(f"PR #{pr['number']} 은 {pr['headRefName']} → {pr['baseRefName']} 입니다. 브랜치 전략 {strategy_msg()}에 맞지 않아 머지할 수 없습니다.")
+        # QA/리뷰 리포트는 로컬 HEAD 가 아니라 실제로 머지될 PR head 기준이어야 한다
+        head = require_qa(cwd, pr["headRefOid"])
+        require_review(cwd, head, str(pr["number"]))
 
 
 def check(command, cwd, depth=0):
@@ -409,12 +476,17 @@ def check(command, cwd, depth=0):
         if not seg:
             continue
         prog = program(seg[0])
-        # bash -c '...', eval '...' 안의 명령도 같은 규칙으로 검사한다
-        if depth < 3 and prog in SHELLS and "-c" in seg[1:]:
-            idx = seg.index("-c", 1)
-            if idx + 1 < len(seg):
+        # bash -c '...', bash -lc, bash <<EOF, eval '...' 안의 명령도 같은 규칙으로 검사한다
+        if depth < 3 and prog in SHELLS:
+            idx = next((k for k, a in enumerate(seg[1:], 1) if re.match(r"^-[A-Za-z]*c[A-Za-z]*$", a)), None)
+            if idx is not None and idx + 1 < len(seg):
                 check(seg[idx + 1], cwd, depth + 1)
-            continue
+                continue
+            docs = [int(m.group(1)) for t in seg for m in [re.match(r"^__HEREDOC(\d+)__$", t)] if m]
+            for d in docs:
+                check(bodies[d], cwd, depth + 1)
+            if docs:
+                continue
         if depth < 3 and prog == "eval":
             check(" ".join(seg[1:]), cwd, depth + 1)
             continue
