@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.test.context.ActiveProfiles
 import java.math.BigDecimal
@@ -23,7 +24,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+// 임의 내장 DB 로 바꾸지 않고 test 프로필의 H2(MySQL 모드)를 그대로 쓴다 — 운영 DB 와 같은 방언으로 DDL 을 검증
 @DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
 class EntityMappingTest(
     @Autowired private val em: EntityManager,
@@ -53,6 +56,31 @@ class EntityMappingTest(
         val stored = em.createNativeQuery("select role from employee where id = :id").setParameter("id", employee.id).singleResult
 
         assertEquals("FDS_ADMIN", stored)
+    }
+
+    @Test
+    fun `Enum 컬럼은 DB 네이티브 enum 이 아니라 문자열 타입이다`() {
+        // 네이티브 enum 이면 상수를 추가해도 ddl-auto update 가 컬럼을 바꾸지 않아 새 값 저장이 실패한다
+        val types =
+            em
+                .createNativeQuery(
+                    "select lower(column_name), data_type from information_schema.columns " +
+                        "where lower(table_name) in ('employee', 'customer', 'transactions', 'care_action') " +
+                        "and lower(column_name) in ('role', 'grade', 'fds_status', 'status')",
+                ).resultList
+                .map { (it as Array<*>)[0] to it[1].toString().uppercase() }
+
+        assertEquals(4, types.size, "Enum 컬럼 4개를 모두 찾아야 한다: $types")
+        types.forEach { (column, type) -> assertEquals("CHARACTER VARYING", type, "$column 컬럼 타입") }
+    }
+
+    @Test
+    fun `같은 계좌번호의 고객은 저장할 수 없다`() {
+        customerRepository.saveAndFlush(customer("110-000-000009"))
+
+        assertThrows<DataIntegrityViolationException> {
+            customerRepository.saveAndFlush(customer("110-000-000009"))
+        }
     }
 
     @Test

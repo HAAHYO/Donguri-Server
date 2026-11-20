@@ -15,6 +15,8 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 
 /**
  * 오탐 등으로 이탈 위험이 생긴 고객에게 보낼 케어 조치. 거래 하나당 하나만 만든다.
@@ -33,6 +35,7 @@ class CareAction(
     @Column(nullable = false, length = 500)
     var actionMessage: String,
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     var status: CareActionStatus = CareActionStatus.PENDING,
     /** 발송한 직원의 username. 발송 전이면 null */

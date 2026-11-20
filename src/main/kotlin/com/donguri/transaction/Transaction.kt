@@ -14,6 +14,8 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.Lob
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
 
 // TRANSACTION 은 SQL 키워드라 테이블명을 복수형으로 둔다
@@ -37,6 +39,7 @@ class Transaction(
     @Column(nullable = false, precision = 5, scale = 4)
     var fraudScore: BigDecimal,
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     var fdsStatus: FdsStatus,
     /** 사후 확인된 실제 사기 여부. 아직 확인 전이면 null */

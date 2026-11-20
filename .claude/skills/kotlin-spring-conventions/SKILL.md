@@ -90,6 +90,8 @@ class AcornNotFoundException : DonguriException(ErrorCode.ACORN_NOT_FOUND)
 
 - 생성자 프로퍼티로 필수 값을 받고, 식별자는 본문의 `@Id @GeneratedValue(strategy = IDENTITY) val id: Long? = null`.
 - `kotlin("plugin.jpa")` + allOpen(`Entity`, `MappedSuperclass`, `Embeddable`)이 설정돼 있다 — `open` 을 직접 쓰지 않는다.
-- 연관관계는 모두 `FetchType.LAZY`, Enum 은 `EnumType.STRING`, 금액은 `BigDecimal` + `precision/scale` 명시.
+- 연관관계는 모두 `FetchType.LAZY`, 금액은 `BigDecimal` + `precision/scale` 명시.
+- Enum 은 `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.VARCHAR)`. 없으면 MySQL 네이티브 `enum(...)` 컬럼이 생겨, 상수를 추가해도 `ddl-auto: update` 가 컬럼을 바꾸지 않아 새 값 저장이 실패한다.
 - 엔티티를 컨트롤러 응답으로 반환하지 않는다(위 레이어 역할). `open-in-view` 는 꺼져 있으므로 지연 로딩은 서비스의 트랜잭션 안에서 끝낸다.
-- 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`), 프로필은 `@ActiveProfiles("test")`.
+- 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`) + `@AutoConfigureTestDatabase(replace = NONE)` + `@ActiveProfiles("test")` — 임의 내장 DB 가 아니라 test 프로필의 H2 MySQL 모드로 검증한다.
+- `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
