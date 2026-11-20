@@ -63,6 +63,11 @@ tasks.withType<Test> {
     }
 }
 
+// 로컬 실행(bootRun)만 local 프로필(초기 데이터 시딩)을 기본으로 켠다. 이미지(bootJar)는 프로필 기본값이 없어 시딩하지 않는다
+tasks.bootRun {
+    systemProperty("spring.profiles.default", "local")
+}
+
 // Dockerfile이 버전과 무관하게 jar를 찾도록 고정 이름 사용, plain jar는 생성하지 않음
 tasks.bootJar {
     archiveFileName = "app.jar"

@@ -1,9 +1,6 @@
 spring:
   application:
     name: donguri
-  profiles:
-    # 프로필을 지정하지 않으면 로컬 개발 환경으로 본다 (초기 데이터 시딩 포함). 운영은 SPRING_PROFILES_ACTIVE=prod
-    default: local
   datasource:
     # 접속 정보는 환경변수로만 받는다. 드라이버는 URL 에서 자동 결정 (스모크에서 H2 URL 로 대체 가능)
     url: ${DB_URL:jdbc:mysql://localhost:3306/fds_bank?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
