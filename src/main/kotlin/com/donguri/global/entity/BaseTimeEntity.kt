@@ -6,9 +6,6 @@ import org.hibernate.annotations.CreationTimestamp
 import org.hibernate.annotations.UpdateTimestamp
 import java.time.LocalDateTime
 
-/**
- * 생성/수정 시각을 Hibernate 가 자동으로 기록한다. 직접 대입하지 않는다.
- */
 @MappedSuperclass
 abstract class BaseTimeEntity {
     @CreationTimestamp

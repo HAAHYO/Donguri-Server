@@ -9,7 +9,6 @@ import org.springframework.context.ApplicationContext
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-// 프로필을 지정하지 않은 기동 = 이미지(bootJar)로 띄운 경우. DB 만 H2 로 바꾼다
 @SpringBootTest(
     properties = [
         "spring.datasource.url=jdbc:h2:mem:default_profile;MODE=MySQL;DATABASE_TO_LOWER=TRUE",

@@ -18,9 +18,6 @@ import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 
-/**
- * 오탐 등으로 이탈 위험이 생긴 고객에게 보낼 케어 조치. 거래 하나당 하나만 만든다.
- */
 @Entity
 @Table(name = "care_action")
 class CareAction(
@@ -35,11 +32,9 @@ class CareAction(
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     var status: CareActionStatus = CareActionStatus.PENDING,
-    /** 발송한 직원의 username. 발송 전이면 null */
     @Column(length = 50)
     var sentBy: String? = null,
 ) : BaseTimeEntity() {
-    /** 거래의 고객에서 가져온다 — 따로 받으면 다른 고객의 거래와 짝지어질 수 있다. 고객별 조회를 위해 컬럼은 둔다 */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false, updatable = false)
     val customer: Customer = transaction.customer

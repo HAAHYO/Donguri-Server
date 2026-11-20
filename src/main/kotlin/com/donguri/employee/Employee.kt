@@ -17,7 +17,6 @@ import org.hibernate.type.SqlTypes
 class Employee(
     @Column(nullable = false, unique = true, length = 50)
     val username: String,
-    /** `{bcrypt}...` 형식의 해시. 평문을 넣지 않는다 */
     @Column(nullable = false)
     var password: String,
     @Enumerated(EnumType.STRING)

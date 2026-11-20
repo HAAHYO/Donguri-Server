@@ -20,10 +20,6 @@ import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import java.util.UUID
 
-/**
- * 로컬 개발용 초기 데이터. 테이블이 비어 있을 때만 넣으므로 재시작해도 중복되지 않는다.
- * 고객/거래는 모두 가상의 데이터다.
- */
 @Component
 @Profile("local")
 class DataInitializer(
@@ -81,7 +77,6 @@ class DataInitializer(
             customer("임채원", "110-123-456710", "210400000", CustomerGrade.VIP, "5100000", 35, "0.0800"),
         )
 
-    /** fdsStatus 는 fraudScore 기준: 0.80 이상 BLOCKED, 0.50 이상 WARNING, 그 외 NORMAL */
     private fun seedTransactions(c: List<Customer>): List<Transaction> =
         listOf(
             tx(c[0], "2800000", 14, false, false, "0.0820", FdsStatus.NORMAL, false, shap("amount_ratio" to 0.031, "tx_hour" to 0.012)),
@@ -96,7 +91,6 @@ class DataInitializer(
                 true,
                 shap("device_changed" to 0.352, "is_overseas" to 0.284, "amount_ratio" to 0.197, "tx_hour" to 0.081),
             ),
-            // 오탐: 해외 여행 중 정상 결제가 차단됨
             tx(
                 c[1],
                 "4500000",
@@ -121,7 +115,6 @@ class DataInitializer(
                 null,
                 shap("device_changed" to 0.274, "tx_hour" to 0.188, "amount_ratio" to 0.096),
             ),
-            // 오탐: 휴대폰 교체 직후 새벽 이체가 차단됨
             tx(
                 c[3],
                 "2400000",
@@ -146,7 +139,6 @@ class DataInitializer(
                 true,
                 shap("amount_ratio" to 0.341, "device_changed" to 0.301, "is_overseas" to 0.227, "tx_hour" to 0.071),
             ),
-            // 오탐: 평소보다 큰 금액의 야간 이체가 차단됨
             tx(
                 c[7],
                 "1200000",
@@ -216,7 +208,6 @@ class DataInitializer(
         shapReasons = shapReasons,
     )
 
-    /** 피처 이름은 고정 식별자라 이스케이프가 필요 없다 */
     private fun shap(vararg contributions: Pair<String, Double>): String =
         contributions.joinToString(prefix = "[", postfix = "]") { (feature, value) ->
             """{"feature":"$feature","shap":$value}"""
