@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: donguri
+  profiles:
+    # 프로필을 지정하지 않으면 로컬 개발 환경으로 본다 (초기 데이터 시딩 포함). 운영은 SPRING_PROFILES_ACTIVE=prod
+    default: local
+  datasource:
+    # 접속 정보는 환경변수로만 받는다. 드라이버는 URL 에서 자동 결정 (스모크에서 H2 URL 로 대체 가능)
+    url: ${DB_URL:jdbc:mysql://localhost:3306/fds_bank?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          time_zone: Asia/Seoul
+
+fds:
+  seed:
+    # 시딩되는 직원 계정의 비밀번호 원천. 비어 있으면 임의 값으로 해시해 로그인 불가 계정이 된다
+    employee-password: ${FDS_SEED_PASSWORD:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
