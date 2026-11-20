@@ -46,20 +46,21 @@ git diff main...HEAD
 
 이 프로젝트는 외부 의존 없이 부팅된다. 정적 분석이 놓치는 것(빈 와이어링, 직렬화 형식, 실제 상태 코드)을 여기서 잡는다.
 
-```bash
-./gradlew bootJar -q
-java -jar build/libs/app.jar --server.port=18080 > _workspace/smoke.log 2>&1 &
-APP_PID=$!
-for i in $(seq 1 60); do curl -sf localhost:18080/actuator/health >/dev/null && break; sleep 1; done
-curl -s -i localhost:18080/actuator/health
-# 계획의 각 엔드포인트: 정상 1회 + 실패 표의 각 행 1회
-curl -s -i -X POST localhost:18080/<path> -H 'Content-Type: application/json' -d '<body>'
-kill $APP_PID
-```
+1. 계획의 각 엔드포인트에 대해 정상 1회 + 실패 표의 각 행 1회를 `_workspace/smoke-requests.txt` 에 쓴다 (Write 도구). 줄마다 `METHOD PATH [JSON 본문]`:
+   ```
+   POST /acorns {"name":"도토리"}
+   POST /acorns {"name":""}
+   GET /acorns/999
+   ```
+2. 실행 — **Bash 타임아웃 300000ms 이상**으로:
+   ```bash
+   bash .claude/scripts/smoke.sh _workspace/smoke-requests.txt
+   ```
+   스크립트가 Gradle toolchain(JDK 21)으로 `bootRun` 을 띄우고, health 대기 → 각 요청 호출 → 종료까지 한다. `java -jar` 를 직접 쓰지 않는다 — PATH 의 java 가 21이 아닐 수 있다.
 
-- 반드시 프로세스를 종료한다. Windows(Git Bash)에서 `kill` 이 안 먹으면 `taskkill //F //PID <pid>` 또는 포트로 찾는다(`netstat -ano | grep 18080`).
 - 각 호출의 **상태 코드와 본문 일부**를 증거로 리포트에 붙인다.
-- 부팅이 실패하면 `_workspace/smoke.log` 의 원인 줄을 인용 — 거의 항상 BLOCKER다.
+- `SMOKE BOOT FAILED` 면 출력된 `_workspace/smoke.log` 원인 줄을 인용 — 거의 항상 BLOCKER다.
+- `포트 사용 중` 이면 이전 프로세스가 남은 것이다. `netstat -ano | grep 18080` 으로 확인해 종료하고 다시 실행한다.
 - 외부 의존(DB 등)이 생겨 띄울 수 없다면 "검증 안 됨"에 적는다. PASS로 쓰지 않는다.
 
 ## 5. 리포트
