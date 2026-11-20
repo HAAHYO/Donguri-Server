@@ -30,7 +30,7 @@ com.donguri
 │   ├── <Domain>Controller.kt
 │   ├── <Domain>Service.kt
 │   ├── <Domain>.kt           도메인 모델/엔티티
-│   ├── <Domain>Repository.kt JpaRepository. Enum 은 별도 파일 <Domain><Name>.kt
+│   ├── <Domain>Repository.kt JpaRepository. Enum 은 타입마다 별도 파일 (예: EmployeeRole.kt, FdsStatus.kt)
 │   ├── <Domain>Exception.kt
 │   └── dto/                  <Action>Request.kt, <Domain>Response.kt
 └── global/
