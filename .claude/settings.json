@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_git.py\" || { s=$?; [ $s -eq 2 ] || echo \"[guard-git] python 실행 실패(exit $s) — 가드가 동작하지 않아 명령을 차단합니다. python 설치/PATH 를 확인하세요.\" >&2; exit 2; }",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git.sh\"",
             "timeout": 30
           }
         ]
