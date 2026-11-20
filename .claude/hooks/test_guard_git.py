@@ -138,7 +138,7 @@ class GuardGitTest(unittest.TestCase):
 
     def test_gh_prefixes_do_not_bypass_gates(self):
         self.feature_branch()
-        self.assertEqual(self.run_hook("GH_TOKEN=x gh pr create --fill"), 2)
+        self.assertEqual(self.run_hook("GH_TOKEN=x gh pr create --base develop --fill"), 2)
         self.assertEqual(self.run_hook("gh -R o/r pr create --fill"), 2)
 
     def test_review_marker_must_match_pr_number(self):
@@ -196,6 +196,91 @@ class GuardGitTest(unittest.TestCase):
         out = subprocess.run([sys.executable, HOOK], input=b"{not json", env=env, capture_output=True)
         self.assertEqual(out.returncode, 2)
 
+    # --- develop 브랜치 전략 ---
+
+    def test_develop_is_protected(self):
+        sh("git", "switch", "-q", "-c", "develop", cwd=self.repo)
+        self.assertEqual(self.run_hook('git commit -m "feat: 추가"'), 2)
+        self.assertEqual(self.run_hook("git push"), 2)
+        self.feature_branch()
+        self.assertEqual(self.run_hook("git push origin HEAD:develop"), 2)
+
+    def test_pr_base_must_follow_branch_strategy(self):
+        self.feature_branch()
+        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
+        self.assertEqual(self.run_hook("gh pr create --fill"), 2)
+        self.assertEqual(self.run_hook("gh pr create --base main --fill"), 2)
+        self.assertEqual(self.run_hook("gh pr create -B develop --fill"), 0)
+        self.assertEqual(self.run_hook("gh pr create --base=develop --fill"), 0)
+        sh("git", "switch", "-q", "-c", "develop", cwd=self.repo)
+        self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 2)
+        self.assertEqual(self.run_hook("gh pr create --base main --fill"), 0)
+
+    # --- QA 라운드 2에서 발견된 우회/오탐 사례 ---
+
+    def test_graphql_only_allows_review_thread_mutations(self):
+        ok = [
+            "gh api graphql -f query='query($pr:Int!){repository(owner:\"o\",name:\"r\"){pullRequest(number:$pr){id}}}' -F pr=1",
+            "gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=X",
+        ]
+        bad = [
+            "gh api graphql -F query=@_workspace/q.graphql",
+            "gh api graphql --input q.json",
+            'gh api graphql -f query="$(cat q)"',
+            "gh api graphql -f query=$(cat q)",
+            "gh api graphql -f query='mutation{updateRef(input:{refId:\"x\",oid:\"y\"}){clientMutationId}}'",
+            "gh api graphql -f query='mutation{createCommitOnBranch(input:{}){commit{oid}}}'",
+            "gh api graphql -f query='mutation{a:resolveReviewThread(input:{}){x} b:mergePullRequest(input:{}){x}}'",
+        ]
+        for cmd in ok:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 0)
+        for cmd in bad:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 2)
+
+    def test_gh_api_rest_writes_to_refs_blocked(self):
+        self.assertEqual(self.run_hook("gh api -X PATCH repos/o/r/git/refs/heads/main -f sha=x"), 2)
+        self.assertEqual(self.run_hook("gh api repos/o/r/git/refs -f ref=refs/heads/main -f sha=x"), 2)
+        self.assertEqual(self.run_hook("gh api repos/o/r/git/refs/heads/main"), 0)
+
+    def test_reply_body_mentioning_merge_is_allowed(self):
+        cmd = "gh api repos/o/r/pulls/1/comments/123/replies -f body='/merges 와 mergeBranch, pulls/1/merge 경로를 막았어요'"
+        self.assertEqual(self.run_hook(cmd), 0)
+
+    def test_shell_wrappers_and_compound_syntax_checked(self):
+        for cmd in [
+            "bash -c 'git commit -m \"feat: 추가\"'",
+            "sh -c \"git push origin main\"",
+            "eval git commit -m 'feat: 추가'",
+            "{ git commit -m 'feat: 추가'; }",
+            "if true; then git commit -m 'feat: 추가'; fi",
+            "! git commit -m 'feat: 추가'",
+            "time -p git commit -m 'feat: 추가'",
+        ]:
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd), 2)
+
+    def test_more_git_bypass_forms(self):
+        self.feature_branch()
+        self.assertEqual(self.run_hook("git push --repo origin main"), 2)
+        self.assertEqual(self.run_hook('git commit --no-veri -m "feat: 추가"'), 2)
+        self.assertEqual(self.run_hook("printf 'bad\\n' | git commit -F -"), 2)
+        self.assertEqual(self.run_hook("git commit -F - <<'EOF'\nbad subject\nEOF"), 2)
+        self.assertEqual(self.run_hook("git commit -F - <<'EOF'\nfix: 수정\nEOF"), 0)
+
+    def test_pr_merge_by_url_checks_number(self):
+        self.feature_branch()
+        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
+        self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
+        self.assertEqual(self.run_hook("gh pr merge https://github.com/o/r/pull/2"), 2)
+        self.assertEqual(self.run_hook("gh pr merge https://github.com/o/r/pull/1"), 0)
+
+    def test_heredoc_delimiter_with_dash(self):
+        self.feature_branch()
+        cmd = "python - <<'END-OF'\nprint('git push origin main')\nEND-OF\ngit status"
+        self.assertEqual(self.run_hook(cmd), 0)
+
     def test_switch_in_same_command_is_tracked(self):
         self.assertEqual(self.run_hook('git switch -c feat/y && git add a.kt && git commit -m "feat: 추가"'), 0)
         self.feature_branch()
@@ -203,13 +288,13 @@ class GuardGitTest(unittest.TestCase):
 
     def test_pr_create_requires_fresh_passing_qa(self):
         self.feature_branch()
-        self.assertEqual(self.run_hook("gh pr create --fill"), 2)
+        self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 2)
         self.write("qa-report.md", "<!-- qa-report head=deadbeef verdict=PASS -->\n")
-        self.assertEqual(self.run_hook("gh pr create --fill"), 2)
+        self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 2)
         self.write("qa-report.md", f"<!-- qa-report head={self.head[:7]} verdict=FAIL -->\n")
-        self.assertEqual(self.run_hook("gh pr create --fill"), 2)
+        self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 2)
         self.write("qa-report.md", f"<!-- qa-report head={self.head[:7]} verdict=PASS -->\n")
-        self.assertEqual(self.run_hook("gh pr create --fill"), 0)
+        self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 0)
 
     def test_pr_merge_requires_clean_self_review(self):
         self.feature_branch()

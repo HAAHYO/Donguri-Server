@@ -1,7 +1,8 @@
 """PreToolUse(Bash) hook: git/gh 작업 규칙을 기계적으로 강제한다.
 
 혼자 하는 프로젝트라 리뷰어가 없으므로, 사람이 지켜줄 규칙을 hook이 대신 지킨다.
-- main 브랜치에서 커밋/푸시 금지 (모든 변경은 PR을 거친다)
+- main/develop 에서 커밋/푸시 금지 (모든 변경은 PR을 거친다)
+- gh pr create 의 base: 기능 브랜치 → develop, develop → main(릴리스)만 허용
 - 일괄 스테이징(git add -A / . / -u) 과 hook 우회(--no-verify) 금지
 - 커밋 메시지 컨벤션 검사 (`<type>: <한국어 요약>`)
 - gh pr create: 현재 HEAD에 대한 자가 QA 리포트(PASS)가 있어야 한다
@@ -25,13 +26,21 @@ SUBJECT_RE = re.compile(rf"^({COMMIT_TYPES})(\([\w./-]+\))?!?: \S.*$")
 MAX_SUBJECT = 72
 QA_MARKER_RE = re.compile(r"<!--\s*qa-report\s+head=([0-9a-f]{7,40})\s+verdict=(PASS|FAIL)\s*-->")
 REVIEW_MARKER_RE = re.compile(r"<!--\s*self-review\s+pr=(\d+)\s+head=([0-9a-f]{7,40})\s+required_open=(\d+)\s*-->")
-PROTECTED_BRANCHES = {"main"}
-HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n(.*?)\n[ \t]*\2(?=\s|$|\))", re.S)
+# 브랜치 전략: 기능 브랜치 → PR → develop, 릴리스는 develop → PR → main (main 푸시가 CD를 트리거)
+INTEGRATION_BRANCH = "develop"
+RELEASE_BRANCH = "main"
+PROTECTED_BRANCHES = {RELEASE_BRANCH, INTEGRATION_BRANCH}
+HEREDOC_RE = re.compile(r"<<-?\s*(['\"]?)([^\s'\"<>|&;()]+)\1[^\n]*\n(.*?)\n[ \t]*\2(?=\s|$|\))", re.S)
 OPERATORS = {"&&", "||", ";", "|", "&", "(", ")", "\n", ";;", "|&"}
 # 값을 별도 토큰으로 받는 전역 옵션
 GIT_GLOBAL_WITH_ARG = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 GH_GLOBAL_WITH_ARG = {"-R", "--repo", "--hostname"}
-WRAPPERS = {"command", "env", "exec", "time", "nohup", "builtin"}
+# 명령 앞에 붙어도 실제 명령은 그 뒤에 오는 토큰들
+WRAPPERS = {"command", "env", "exec", "time", "nohup", "builtin", "sudo", "{", "}", "!", "if", "then", "else", "elif",
+            "do", "while", "until", "fi", "done"}
+SHELLS = {"bash", "sh", "zsh", "dash"}
+# gh api graphql 에서 허용하는 mutation (리뷰 스레드 답글/해결만)
+ALLOWED_MUTATIONS = {"resolveReviewThread", "unresolveReviewThread", "addPullRequestReviewThreadReply"}
 UNKNOWN = object()  # 이 명령 안에서 브랜치가 바뀌었지만 어디로 바뀌었는지 알 수 없음
 
 
@@ -88,7 +97,8 @@ def strip_prefix(seg):
     i = 0
     while i < len(seg):
         tok = seg[i]
-        if re.match(r"^[A-Za-z_]\w*=", tok) or tok in WRAPPERS or (seg[i - 1:i] == ["env"] and tok.startswith("-")):
+        prev = seg[i - 1] if i else ""
+        if re.match(r"^[A-Za-z_]\w*=", tok) or tok in WRAPPERS or (prev in ("env", "time", "sudo") and tok.startswith("-")):
             i += 1
             continue
         break
@@ -144,7 +154,11 @@ def commit_subject(args, bodies, cwd):
         if a in ("-F", "--file") or a.startswith("--file="):
             path = a.split("=", 1)[1] if "=" in a else nxt
             if path == "-":
-                return None
+                # stdin 메시지: 같은 명령의 heredoc 이면 그 본문, 파이프면 내용을 알 수 없으므로 차단
+                doc = next((t for t in args if re.match(r"^__HEREDOC\d+__$", t)), None)
+                if doc:
+                    return resolve_message(f"<<{doc}", bodies)
+                block("git commit -F - 로 파이프된 메시지는 검사할 수 없습니다. -m \"$(cat <<'EOF' ... EOF)\" 형식을 쓰세요.")
             try:
                 with open(os.path.join(cwd, path), encoding="utf-8") as fh:
                     return resolve_message(fh.read(), bodies)
@@ -209,7 +223,8 @@ def check_git(opts, sub, args, state, bodies):
             branch = state["branch"].get(cwd) or git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd)
         state["branch"][cwd] = branch
 
-    if "--no-verify" in args:
+    # git 은 모호하지 않은 옵션 약어(--no-veri)도 받아들인다
+    if any(len(a) >= 6 and "--no-verify".startswith(a) for a in args):
         block("--no-verify 는 금지입니다. hook 이 실패하면 원인을 고치세요.")
 
     if sub in ("switch", "checkout"):
@@ -249,7 +264,7 @@ def check_git(opts, sub, args, state, bodies):
         if branch is UNKNOWN:
             block("같은 명령 안에서 브랜치를 바꾼 뒤 커밋하고 있어 대상 브랜치를 알 수 없습니다. 명령을 나눠 실행하세요.")
         if branch in PROTECTED_BRANCHES:
-            block(f"'{branch}' 브랜치에 직접 커밋할 수 없습니다. `git switch -c feat/<주제>` 로 브랜치를 먼저 만드세요.")
+            block(f"'{branch}' 브랜치에 직접 커밋할 수 없습니다. `git switch -c feat/<주제> {INTEGRATION_BRANCH}` 로 브랜치를 먼저 만드세요.")
         if "--amend" in args and "--no-edit" in args:
             return
         subject = commit_subject(args, bodies, cwd)
@@ -262,9 +277,11 @@ def check_git(opts, sub, args, state, bodies):
         return
 
     if sub == "push":
-        if any(a in ("--all", "--mirror") for a in args):
-            block("git push --all / --mirror 는 main 을 포함하므로 금지입니다. 브랜치를 지정해 푸시하세요.")
+        protected_msg = f"{RELEASE_BRANCH}/{INTEGRATION_BRANCH} 에 직접 푸시할 수 없습니다. 기능 브랜치를 푸시하고 PR 을 여세요."
+        if any(a in ("--all", "--mirror", "--branches") for a in args):
+            block("git push --all / --mirror 는 보호 브랜치를 포함하므로 금지입니다. 브랜치를 지정해 푸시하세요.")
         positional, i = [], 0
+        repo_given = any(a == "--repo" or a.startswith("--repo=") for a in args)
         while i < len(args):
             a = args[i]
             if a in ("-o", "--push-option", "--repo", "--receive-pack", "--exec") and i + 1 < len(args):
@@ -273,13 +290,14 @@ def check_git(opts, sub, args, state, bodies):
             if not a.startswith("-"):
                 positional.append(a)
             i += 1
-        refspecs = positional[1:]
+        # --repo 로 원격을 지정하면 위치 인자는 모두 refspec 이다
+        refspecs = positional if repo_given else positional[1:]
         tags_only = "--tags" in args or "--follow-tags" in args
         if not refspecs:
             if tags_only and "--follow-tags" not in args:
                 return
             if branch is UNKNOWN or branch in PROTECTED_BRANCHES:
-                block("main 에 직접 푸시할 수 없습니다. 기능 브랜치를 푸시하고 PR 을 여세요.")
+                block(protected_msg)
             return
         for spec in refspecs:
             spec = spec.lstrip("+")
@@ -290,28 +308,100 @@ def check_git(opts, sub, args, state, bodies):
                 block("푸시 대상 브랜치를 알 수 없습니다. 명령을 나눠 실행하세요.")
             dst = re.sub(r"^refs/heads/", "", dst or "")
             if dst in PROTECTED_BRANCHES:
-                block("main 에 직접 푸시할 수 없습니다. 기능 브랜치를 푸시하고 PR 을 여세요.")
+                block(protected_msg)
 
 
-def check_gh(sub, args, state):
+def option_values(args, names):
+    """`-X v`, `-Xv`(짧은 옵션), `--name=v` 형태의 값을 모두 모은다."""
+    values, i = [], 0
+    while i < len(args):
+        a = args[i]
+        for n in names:
+            if a == n and i + 1 < len(args):
+                values.append(args[i + 1])
+                i += 1
+                break
+            if n.startswith("--") and a.startswith(n + "="):
+                values.append(a.split("=", 1)[1])
+                break
+            if not n.startswith("--") and a.startswith(n) and len(a) > len(n):
+                values.append(a[len(n):])
+                break
+        i += 1
+    return values
+
+
+def check_gh_api(args, bodies):
+    """gh api 는 리뷰/코멘트 읽기·쓰기만 허용한다. 본문(-f body=...) 텍스트는 검사하지 않는다."""
+    gate_msg = "gh api 로 머지하거나 브랜치를 직접 바꾸는 것은 금지입니다. 셀프 리뷰 게이트를 거치도록 `gh pr merge` 를 사용하세요."
+    value_opts = {"-X", "--method", "-f", "--raw-field", "-F", "--field", "-H", "--header", "--input", "-q", "--jq",
+                  "-t", "--template", "--hostname", "--cache", "-p", "--preview"}
+    positional, i = [], 0
+    while i < len(args):
+        a = args[i]
+        if a in value_opts:
+            i += 2
+            continue
+        if not a.startswith("-"):
+            positional.append(a)
+        i += 1
+    endpoint = positional[0] if positional else ""
+    fields = option_values(args, ["-f", "--raw-field", "-F", "--field"])
+    methods = [m.upper() for m in option_values(args, ["-X", "--method"])]
+    method = methods[-1] if methods else ("POST" if fields or "--input" in args else "GET")
+
+    if endpoint == "graphql":
+        if "--input" in args:
+            block("gh api graphql --input 은 검사할 수 없어 금지입니다. -f query='...' 로 쿼리를 명령에 직접 쓰세요.")
+        queries = [f.split("=", 1)[1] for f in fields if f.startswith("query=")]
+        if not queries:
+            block("gh api graphql 은 -f query='...' 로 쿼리를 직접 지정해야 합니다.")
+        for q in queries:
+            if q.startswith("@") or "__HEREDOC" in q or "$(" in q or "`" in q or q.endswith("$") or not q.strip():
+                block("gh api graphql 쿼리는 파일/치환이 아니라 명령에 직접 써야 검사할 수 있습니다.")
+            if re.search(r"\bmutation\b", q):
+                # 인자를 받는 모든 필드 이름을 허용 목록과 대조한다 (작업 이름 `mutation Foo(...)` 는 제외)
+                names = set(re.findall(r"(\w+)\s*\(", re.sub(r"\bmutation\b\s*\w*", "", q)))
+                bad = names - ALLOWED_MUTATIONS
+                if not names or bad:
+                    block(f"허용되지 않은 GraphQL mutation 입니다({', '.join(sorted(bad)) or '알 수 없음'}). "
+                          f"허용: {', '.join(sorted(ALLOWED_MUTATIONS))}")
+        return
+
+    path = endpoint.split("?", 1)[0]
+    if re.search(r"/pulls/\d+/merge\b|/merges\b|/git/refs\b|/git/commits\b|/contents/|/pulls/\d+/update-branch", path) and method != "GET":
+        block(gate_msg)
+
+
+def check_gh(sub, args, state, bodies):
     cwd = state["cwd"]
     if sub == "api":
-        joined = " ".join(args)
-        if re.search(r"/pulls/\d+/merge\b|/merges\b|mergePullRequest|enablePullRequestAutoMerge|mergeBranch", joined):
-            block("gh api 로 머지하는 것은 금지입니다. 셀프 리뷰 게이트를 거치도록 `gh pr merge` 를 사용하세요.")
+        check_gh_api(args, bodies)
         return
     if sub != "pr" or not args:
         return
-    action = args[0]
+    action, rest = args[0], args[1:]
     if action in ("create", "new"):
+        branch = git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd)
+        bases = option_values(rest, ["-B", "--base"])
+        expected = RELEASE_BRANCH if branch == INTEGRATION_BRANCH else INTEGRATION_BRANCH
+        if not bases:
+            block(f"gh pr create 에 --base {expected} 를 명시하세요 (기능 → {INTEGRATION_BRANCH}, 릴리스 {INTEGRATION_BRANCH} → {RELEASE_BRANCH}).")
+        if bases[-1] != expected:
+            block(f"'{branch}' 의 PR base 는 {expected} 여야 합니다 (기능 → {INTEGRATION_BRANCH}, 릴리스 {INTEGRATION_BRANCH} → {RELEASE_BRANCH}).")
         require_qa(cwd)
     elif action == "merge":
         head = require_qa(cwd)
-        number = next((a.lstrip("#") for a in args[1:] if re.match(r"^#?\d+$", a)), None)
+        number = None
+        for a in rest:
+            m = re.match(r"^#?(\d+)$", a) or re.search(r"/pull/(\d+)", a)
+            if m:
+                number = m.group(1)
+                break
         require_review(cwd, head, number)
 
 
-def check(command, cwd):
+def check(command, cwd, depth=0):
     segments, bodies = tokenize(command)
     state = {"cwd": cwd, "branch": {}}
     for seg in segments:
@@ -319,6 +409,15 @@ def check(command, cwd):
         if not seg:
             continue
         prog = program(seg[0])
+        # bash -c '...', eval '...' 안의 명령도 같은 규칙으로 검사한다
+        if depth < 3 and prog in SHELLS and "-c" in seg[1:]:
+            idx = seg.index("-c", 1)
+            if idx + 1 < len(seg):
+                check(seg[idx + 1], cwd, depth + 1)
+            continue
+        if depth < 3 and prog == "eval":
+            check(" ".join(seg[1:]), cwd, depth + 1)
+            continue
         if prog == "git":
             opts, sub, args = split_globals(seg[1:], GIT_GLOBAL_WITH_ARG)
             if sub:
@@ -326,7 +425,7 @@ def check(command, cwd):
         elif prog == "gh":
             _, sub, args = split_globals(seg[1:], GH_GLOBAL_WITH_ARG)
             if sub:
-                check_gh(sub, args, state)
+                check_gh(sub, args, state, bodies)
 
 
 def main():
