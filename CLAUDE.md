@@ -18,7 +18,7 @@ Kotlin + Spring Boot 4 (Gradle Kotlin DSL, JDK 21) 백엔드.
 ## 구조
 - `src/main/kotlin/com/donguri` — 애플리케이션 코드
 - `src/test/kotlin/com/donguri` — 테스트
-- `.github/workflows/ci.yml` — PR/main 푸시 시 `./gradlew check`
+- `.github/workflows/ci.yml` — PR, main/develop 푸시 시 `./gradlew check`
 - `.github/workflows/cd.yml` — main/`v*` 태그 푸시 시 검증 후 Docker 이미지를 GHCR에 푸시
 - `.claude/` — 에이전트 하네스 (권한, hook, 에이전트, 스킬)
 - `_workspace/` — 작업별 계획/QA/리뷰 기록 (gitignore, 지우지 않는다)
@@ -29,12 +29,15 @@ Kotlin 파일을 쓰거나 리뷰하기 전에는 항상 `kotlin-spring-conventi
 
 계획 → 구현+테스트 → 커밋 → **자가 QA**(`qa-inspector`) → PR → **셀프 리뷰**(`pr-reviewer`, GitHub에 코멘트) → 반영/거절 답글 → 재QA·재리뷰 → 사용자 확인 후 머지
 
+**브랜치 전략:** `origin/develop` 에서 `<type>/<주제>` 브랜치 → PR → `develop`. 기능이 모이면 릴리스 PR `develop` → `main` (main 머지 = CD 배포). main/develop 직접 커밋·푸시는 hook이 막는다.
+
 | 구성 | 역할 |
 |------|------|
 | `agents/qa-inspector` | 구현 컨텍스트 없이 검증 + 앱 실행 스모크 → `_workspace/qa-report.md` |
 | `agents/pr-reviewer` | 없는 팀원 대신 PR 리뷰 → GitHub 코멘트 + `_workspace/review-report.md` |
 | `skills/` | `donguri-workflow`, `self-qa`, `pr-review`, `review-response`, `git-commit-convention`, `kotlin-spring-conventions` |
-| `hooks/guard_git.py` (PreToolUse) | main 커밋/푸시, 일괄 스테이징, hook 우회, 잘못된 커밋 제목 차단. 현재 HEAD 기준 QA PASS 없이 `gh pr create`, 셀프 리뷰 필수 0건 없이 `gh pr merge` 차단 |
+| `hooks/guard_git.py` (PreToolUse, `guard-git.sh` 로 실행) | main/develop 커밋·푸시, 일괄 스테이징, hook 우회, 잘못된 커밋 제목, 브랜치 전략에 맞지 않는 PR base, `gh api` 머지·ref 쓰기 차단. 현재 HEAD 기준 QA PASS 없이 `gh pr create`, 셀프 리뷰 필수 0건 없이 `gh pr merge` 차단 |
+| `scripts/smoke.sh` | QA 스모크: toolchain JDK로 앱 기동 → 요청 → 종료 |
 | `hooks/verify.sh` (Stop) | `./gradlew check` 실패 시 종료 차단 |
 
 - QA/리뷰 리포트의 첫 줄 마커는 해당 에이전트만 쓴다. 메인 에이전트가 직접 쓰거나 고치면 하네스가 무의미해진다.

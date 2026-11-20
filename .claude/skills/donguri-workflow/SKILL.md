@@ -17,7 +17,9 @@ description: "Donguri 백엔드의 작업 전 과정 오케스트레이터 — �
 
 ### 기계적 강제 (PreToolUse hook `guard_git.py`)
 말로 하는 규칙이 아니라 hook이 막는다. 우회하려 하지 말고 원인을 해결한다.
-- main 에 커밋/푸시 불가 → 항상 기능 브랜치
+- main/develop 에 커밋/푸시 불가 → 항상 기능 브랜치
+- `gh pr create` 는 `--base` 필수: 기능 브랜치 → `develop`, `develop` → `main`(릴리스)만 허용
+- `gh api` 는 리뷰 스레드 답글/해결 외의 GraphQL mutation, ref 쓰기 금지
 - `git add -A` / `.` / `--no-verify` 불가
 - 커밋 제목 형식 검사
 - `gh pr create` ← `_workspace/qa-report.md` 가 **현재 HEAD** 기준 `PASS` 여야 함
@@ -37,7 +39,7 @@ description: "Donguri 백엔드의 작업 전 과정 오케스트레이터 — �
 
 ## Phase 1: 계획
 
-1. main 이면 `git switch -c <type>/<kebab-주제>` (예: `feat/acorn-api`).
+1. 최신 develop 에서 브랜치를 만든다: `git fetch origin` → `git switch -c <type>/<kebab-주제> origin/develop` (예: `feat/acorn-api`).
 2. `_workspace/01_plan.md` 에 작성 — 이 문서가 QA의 체크리스트가 된다:
    - 요청 요약, 범위 밖인 것
    - 엔드포인트마다: 메서드/경로, 요청/응답 필드(nullable 여부 포함), **실패 케이스 표**(입력 → 상태 코드 → 예외 클래스)
@@ -58,7 +60,7 @@ description: "Donguri 백엔드의 작업 전 과정 오케스트레이터 — �
 
 ```
 Agent(subagent_type: "qa-inspector",
-      prompt: "현재 브랜치(<branch>, base main)의 변경을 self-qa 스킬대로 검증하라. 계획: _workspace/01_plan.md. 리포트: _workspace/qa-report.md")
+      prompt: "현재 브랜치(<branch>, base develop)의 변경을 self-qa 스킬대로 검증하라. 계획: _workspace/01_plan.md. 리포트: _workspace/qa-report.md")
 ```
 
 - FAIL → BLOCKER를 고치고 커밋 → 같은 에이전트를 **재검증 모드로** 다시 호출. 최대 3회. 3회 후에도 FAIL이면 멈추고 사용자에게 보고한다.
@@ -88,7 +90,18 @@ Agent(subagent_type: "pr-reviewer",
 
 ## Phase 8: 머지
 
-`required_open=0` 이고 CI(`gh pr checks`)가 통과하면 사용자에게 머지 여부를 묻는다. 머지는 main 에 푸시되어 CD(GHCR 이미지 배포)를 트리거하므로 항상 확인을 받는다 (`gh pr merge` 는 권한상 ask).
+`required_open=0` 이고 CI(`gh pr checks`)가 통과하면 사용자에게 머지 여부를 묻는다 (`gh pr merge` 는 권한상 ask). 기능 PR 은 `develop` 으로 머지된다 — 배포는 일어나지 않는다.
+
+## Phase 8b: 릴리스 (develop → main)
+
+사용자가 "릴리스해줘", "main 에 올려줘" 라고 할 때만. main 머지는 CD(GHCR 이미지 배포)를 트리거한다.
+
+1. `git switch develop && git pull` (로컬 develop 은 읽기 전용 — 커밋하지 않는다)
+2. `_workspace/` 를 `_workspace_<timestamp>/` 로 보관하고 새로 만든다. `01_plan.md` 에는 `git log --oneline origin/main..origin/develop` 로 이번 릴리스에 포함된 PR 목록을 적는다.
+3. qa-inspector — develop HEAD 기준 전체 QA(빌드 + 스모크)
+4. `gh pr create --base main --head develop` (hook 이 develop 에서만 main 을 base 로 허용)
+5. pr-reviewer — 릴리스 PR 은 이미 리뷰된 변경의 묶음이다. 기능 PR 간 상호작용, 설정/배포 영향(새 필수 환경변수 등)만 본다.
+6. 사용자 확인 후 머지 → CD 실행 결과를 `gh run list --workflow cd.yml` 로 확인해 보고한다.
 
 ## Phase 9: 마무리 보고 + 하네스 개선
 
@@ -118,6 +131,7 @@ QA나 리뷰어가 **같은 종류의 지적을 두 번째로** 했다면 `_work
 | "셀프 리뷰해줘" | 6 |
 | "리뷰 반영해줘" | 7 |
 | "머지해줘" | 8 |
+| "릴리스해줘", "main 에 올려줘" | 8b |
 
 ## 오류 처리
 

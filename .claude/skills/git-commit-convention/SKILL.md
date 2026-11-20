@@ -1,6 +1,6 @@
 ---
 name: git-commit-convention
-description: "Donguri의 커밋 규칙 — 영어 type 접두사 + 짧은 한국어 요약, 한 커밋에 한 관심사, 의존성 순서. 이 저장소에서 커밋할 때마다, '커밋해줘', 섞인 변경을 나눌 때, PR 전에 사용한다. 형식과 main 보호는 guard_git.py hook이 강제한다."
+description: "Donguri의 커밋 규칙 — 영어 type 접두사 + 짧은 한국어 요약, 한 커밋에 한 관심사, 의존성 순서. 이 저장소에서 커밋할 때마다, '커밋해줘', 섞인 변경을 나눌 때, PR 전에 사용한다. 형식과 main/develop 보호는 guard_git.py hook이 강제한다."
 ---
 
 # 커밋 컨벤션
@@ -59,7 +59,7 @@ Co-Authored-By: ...
    ```
 
 ## 규칙 (hook 강제 항목 포함)
-- main 에서 커밋하지 않는다 — 브랜치 `<type>/<kebab-주제>` (hook 강제)
+- main/develop 에서 커밋하지 않는다 — `origin/develop` 에서 브랜치 `<type>/<kebab-주제>` 를 만든다 (hook 강제)
 - `--no-verify` 금지 (hook 강제), force push 금지 (권한 deny)
 - push된 커밋을 amend 하지 않는다. 새 커밋을 쌓는다
 - 비밀값을 커밋하지 않는다 — 새 설정 파일은 스테이징 전에 읽어본다

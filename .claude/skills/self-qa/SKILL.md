@@ -12,9 +12,10 @@ description: "Donguri 서버 변경에 대한 자가 QA 절차 — 계획 대비
 ```bash
 git status --short                  # 비어 있어야 함 (아니면 BLOCKER)
 git rev-parse HEAD                  # 리포트 마커에 쓸 값
-git log --oneline main..HEAD        # 이번 변경의 커밋들
-git diff --stat main...HEAD
-git diff main...HEAD
+git fetch origin -q
+git log --oneline origin/develop..HEAD     # 이번 변경의 커밋들 (릴리스 QA 는 origin/main..HEAD)
+git diff --stat origin/develop...HEAD
+git diff origin/develop...HEAD
 ```
 
 `_workspace/01_plan.md` 의 엔드포인트와 실패 케이스 표가 체크리스트다.
