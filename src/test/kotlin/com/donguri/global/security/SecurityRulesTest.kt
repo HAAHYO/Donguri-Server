@@ -1,6 +1,7 @@
 package com.donguri.global.security
 
 import com.donguri.employee.EmployeeRole
+import io.jsonwebtoken.Jwts
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
@@ -8,9 +9,11 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import testsupport.SecuredTestController
 import java.time.Clock
 import java.time.Duration
@@ -44,6 +47,7 @@ class SecurityRulesTest(
 
         expect("/test/authenticated", "Bearer $forged", 401, "UNAUTHORIZED")
         expect("/test/authenticated", "Bearer $expired", 401, "UNAUTHORIZED")
+        expect("/test/authenticated", "Bearer ${unsignedToken()}", 401, "UNAUTHORIZED")
     }
 
     @Test
@@ -74,6 +78,42 @@ class SecurityRulesTest(
         }
     }
 
+    @Test
+    fun `Authentication 의 name 은 username 이다`() {
+        mockMvc
+            .get("/test/whoami") { header(HttpHeaders.AUTHORIZATION, bearer(EmployeeRole.CRM_MARKETER)) }
+            .andExpect { content { string("u") } }
+    }
+
+    @Test
+    fun `인증된 요청의 404, 405, 500 도 ProblemDetail 과 code 로 응답하고 내부 메시지를 노출하지 않는다`() {
+        expect("/api/does-not-exist", bearer(EmployeeRole.FDS_ADMIN), 404, "NOT_FOUND")
+        expect("/api/auth/login", bearer(EmployeeRole.FDS_ADMIN), 405, "METHOD_NOT_ALLOWED")
+        expect("/test/boom", bearer(EmployeeRole.FDS_ADMIN), 500, "INTERNAL_ERROR")
+        mockMvc
+            .get("/test/boom") { header(HttpHeaders.AUTHORIZATION, bearer(EmployeeRole.FDS_ADMIN)) }
+            .andExpect { content { string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("internal-detail"))) } }
+    }
+
+    @Test
+    fun `지원하지 않는 Content-Type 의 로그인은 415 를 반환한다`() {
+        mockMvc
+            .post("/api/auth/login") {
+                contentType = MediaType.TEXT_PLAIN
+                content = "fds_admin"
+            }.andExpect {
+                status { isEqualTo(415) }
+                jsonPath("$.code") { value("UNSUPPORTED_MEDIA_TYPE") }
+            }
+    }
+
+    private fun unsignedToken() =
+        Jwts
+            .builder()
+            .claim("username", "fds_admin")
+            .claim("role", "FDS_ADMIN")
+            .compact()
+
     private fun bearer(role: EmployeeRole) = "Bearer ${jwtTokenProvider.createAccessToken("u", role)}"
 
     private fun expect(
@@ -87,7 +127,10 @@ class SecurityRulesTest(
                 authorization?.let { header(HttpHeaders.AUTHORIZATION, it) }
             }.andExpect {
                 status { isEqualTo(status) }
-                if (code != null) jsonPath("$.code") { value(code) }
+                if (code != null) {
+                    content { contentType(MediaType.APPLICATION_PROBLEM_JSON) }
+                    jsonPath("$.code") { value(code) }
+                }
             }
     }
 }

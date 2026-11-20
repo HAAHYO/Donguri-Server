@@ -37,7 +37,7 @@ class SecurityConfig {
     ): JwtTokenProvider {
         val secret =
             properties.secret.ifBlank {
-                check(environment.acceptsProfiles(Profiles.of("local"))) { "JWT_SECRET 환경변수가 설정되지 않았습니다." }
+                check(environment.acceptsProfiles(Profiles.of("local & !prod"))) { "JWT_SECRET 환경변수가 설정되지 않았습니다." }
                 log.warn("JWT_SECRET 이 설정되지 않아 임의 키를 생성합니다. 재시작하면 기존 토큰은 무효가 됩니다.")
                 Base64.getEncoder().encodeToString(ByteArray(32).also(SecureRandom()::nextBytes))
             }

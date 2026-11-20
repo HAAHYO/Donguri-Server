@@ -62,7 +62,7 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    fun `형식이 깨진 토큰과 role 이 없거나 모르는 값인 토큰은 거부한다`() {
+    fun `형식이 깨졌거나 서명이 없거나(alg none) role 이 없거나 모르는 값인 토큰은 거부한다`() {
         val key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret))
         val noRole =
             Jwts
@@ -79,6 +79,15 @@ class JwtTokenProviderTest {
                 .compact()
 
         assertNull(provider.parse("not-a-jwt"))
+        assertNull(
+            provider.parse(
+                Jwts
+                    .builder()
+                    .claim("username", "x")
+                    .claim("role", "FDS_ADMIN")
+                    .compact(),
+            ),
+        )
         assertNull(provider.parse(noRole))
         assertNull(provider.parse(unknownRole))
     }
@@ -98,6 +107,9 @@ class JwtTokenProviderTest {
         assertThrows<IllegalStateException> { config.jwtTokenProvider(JwtProperties(secret = ""), MockEnvironment()) }
         assertThrows<IllegalStateException> {
             config.jwtTokenProvider(JwtProperties(secret = ""), MockEnvironment().apply { setActiveProfiles("prod") })
+        }
+        assertThrows<IllegalStateException> {
+            config.jwtTokenProvider(JwtProperties(secret = ""), MockEnvironment().apply { setActiveProfiles("local", "prod") })
         }
     }
 }
