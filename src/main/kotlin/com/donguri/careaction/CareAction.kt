@@ -24,9 +24,6 @@ import org.hibernate.type.SqlTypes
 @Entity
 @Table(name = "care_action")
 class CareAction(
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "customer_id", nullable = false)
-    val customer: Customer,
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "transaction_id", nullable = false, unique = true)
     val transaction: Transaction,
@@ -42,6 +39,11 @@ class CareAction(
     @Column(length = 50)
     var sentBy: String? = null,
 ) : BaseTimeEntity() {
+    /** 거래의 고객에서 가져온다 — 따로 받으면 다른 고객의 거래와 짝지어질 수 있다. 고객별 조회를 위해 컬럼은 둔다 */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "customer_id", nullable = false, updatable = false)
+    val customer: Customer = transaction.customer
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null

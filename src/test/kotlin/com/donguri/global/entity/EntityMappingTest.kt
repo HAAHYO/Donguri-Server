@@ -96,11 +96,35 @@ class EntityMappingTest(
     fun `한 거래에는 케어 조치를 하나만 만들 수 있다`() {
         val customer = customerRepository.save(customer("110-000-000002"))
         val transaction = transactionRepository.saveAndFlush(transaction(customer, "[]"))
-        careActionRepository.saveAndFlush(CareAction(customer, transaction, "우대금리 적금", "불편을 드려 죄송합니다."))
+        careActionRepository.saveAndFlush(CareAction(transaction, "우대금리 적금", "불편을 드려 죄송합니다."))
 
         assertThrows<DataIntegrityViolationException> {
-            careActionRepository.saveAndFlush(CareAction(customer, transaction, "수수료 면제", "다시 안내드립니다."))
+            careActionRepository.saveAndFlush(CareAction(transaction, "수수료 면제", "다시 안내드립니다."))
         }
+    }
+
+    @Test
+    fun `케어 조치의 고객은 항상 거래의 고객으로 저장된다`() {
+        val customer = customerRepository.save(customer("110-000-000004"))
+        val transaction = transactionRepository.save(transaction(customer, "[]"))
+        val saved = careActionRepository.saveAndFlush(CareAction(transaction, "우대금리 적금", "불편을 드려 죄송합니다."))
+        em.clear()
+
+        val storedCustomerId =
+            em
+                .createNativeQuery("select customer_id from care_action where id = :id")
+                .setParameter("id", saved.id)
+                .singleResult
+
+        assertEquals(customer.id, (storedCustomerId as Number).toLong())
+        // 로딩(기본 생성자 경로)에서도 연관관계가 채워지는지
+        assertEquals(
+            customer.id,
+            careActionRepository
+                .findById(saved.id!!)
+                .get()
+                .customer.id,
+        )
     }
 
     @Test
