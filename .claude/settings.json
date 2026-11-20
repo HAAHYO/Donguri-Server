@@ -31,8 +31,10 @@
       "Bash(gh run list*)",
       "Bash(gh run view*)",
       "Bash(gh api graphql*)",
-      "Bash(gh api repos/HAAHYO/Donguri-Server/*)",
-      "Bash(python .claude/hooks/test_guard_git.py*)"
+      "Bash(gh api repos/HAAHYO/Donguri-Server/pulls/*/reviews*)",
+      "Bash(gh api repos/HAAHYO/Donguri-Server/pulls/*/comments*)",
+      "Bash(python .claude/hooks/test_guard_git.py*)",
+      "Bash(bash .claude/scripts/smoke.sh*)"
     ],
     "ask": [
       "Bash(gh pr merge*)",
@@ -45,6 +47,8 @@
       "Bash(git push * --force*)",
       "Bash(git push * -f*)",
       "Bash(git reset --hard*)",
+      "Bash(gh api *merge*)",
+      "Bash(gh api *Merge*)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Edit(gradle/wrapper/**)"
@@ -57,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_git.py\"",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_git.py\" || { s=$?; [ $s -eq 2 ] || echo \"[guard-git] python 실행 실패(exit $s) — 가드가 동작하지 않아 명령을 차단합니다. python 설치/PATH 를 확인하세요.\" >&2; exit 2; }",
             "timeout": 30
           }
         ]
