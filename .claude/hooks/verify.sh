@@ -9,6 +9,22 @@ input="$(cat)"
 attempts_file="build/.claude-verify-attempts"
 max_attempts=3
 
+# 하네스 hook 을 바꿨으면 hook 회귀 테스트를 강제한다 (CI 와 같은 명령)
+if [ -n "$(git status --porcelain -- .claude/hooks 2>/dev/null)" ]; then
+  if ! hook_log="$(python .claude/hooks/test_guard_git.py 2>&1)"; then
+    # 이미 한 번 차단했는데 여전히 실패하면 루프를 피하고 경고만 남긴다
+    if echo "$input" | grep -q '"stop_hook_active":[[:space:]]*true'; then
+      echo '{"systemMessage": "verify hook: hook 회귀 테스트가 여전히 실패합니다. 직접 확인이 필요합니다."}'
+      exit 0
+    fi
+    {
+      echo "hook 회귀 테스트 실패 (python .claude/hooks/test_guard_git.py). 아래 오류를 고친 뒤 다시 마무리하세요."
+      echo "$hook_log" | grep -E "FAIL|ERROR|Error|assert" | tail -20
+    } >&2
+    exit 2
+  fi
+fi
+
 # 코드/빌드 파일 변경이 없으면 검증 생략 (대화만 한 턴에서 빌드 비용 절약)
 if [ -z "$(git status --porcelain -- src '*.kts' gradle 2>/dev/null)" ]; then
   exit 0

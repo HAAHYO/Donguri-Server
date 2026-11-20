@@ -4,6 +4,7 @@
       "Bash(./gradlew build*)",
       "Bash(./gradlew check*)",
       "Bash(./gradlew test*)",
+      "Bash(./gradlew compileKotlin*)",
       "Bash(./gradlew ktlintCheck*)",
       "Bash(./gradlew ktlintFormat*)",
       "Bash(./gradlew bootRun*)",
@@ -11,7 +12,34 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(git show*)",
-      "Bash(git branch*)"
+      "Bash(git branch*)",
+      "Bash(git rev-parse*)",
+      "Bash(git fetch*)",
+      "Bash(git switch*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push -u origin *)",
+      "Bash(git push)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr diff*)",
+      "Bash(gh pr checks*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr create*)",
+      "Bash(gh pr edit*)",
+      "Bash(gh pr comment*)",
+      "Bash(gh pr review * --comment*)",
+      "Bash(gh run list*)",
+      "Bash(gh run view*)",
+      "Bash(gh api graphql*)",
+      "Bash(gh api repos/HAAHYO/Donguri-Server/pulls/*/reviews*)",
+      "Bash(gh api repos/HAAHYO/Donguri-Server/pulls/*/comments*)",
+      "Bash(python .claude/hooks/test_guard_git.py*)",
+      "Bash(bash .claude/scripts/smoke.sh*)"
+    ],
+    "ask": [
+      "Bash(gh pr merge*)",
+      "Bash(gh pr review * --approve*)",
+      "Bash(gh pr review * --request-changes*)"
     ],
     "deny": [
       "Bash(git push --force*)",
@@ -19,12 +47,26 @@
       "Bash(git push * --force*)",
       "Bash(git push * -f*)",
       "Bash(git reset --hard*)",
+      "Bash(gh api *merge*)",
+      "Bash(gh api *Merge*)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Edit(gradle/wrapper/**)"
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-git.sh\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
