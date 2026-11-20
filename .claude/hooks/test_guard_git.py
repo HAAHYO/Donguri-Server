@@ -344,6 +344,25 @@ class GuardGitTest(unittest.TestCase):
         self.assertEqual(run("git add ."), 2)
         self.assertEqual(run("git status"), 0)
 
+    def test_verify_hook_skips_hook_tests_without_python(self):
+        verify = os.path.join(os.path.dirname(HOOK), "verify.sh")
+        os.makedirs(os.path.join(self.repo, ".claude", "hooks"))
+        with open(os.path.join(self.repo, ".claude", "hooks", "x.py"), "w", encoding="utf-8") as fh:
+            fh.write("")
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": self.repo, "GUARD_PYTHON": "no-such-python"}
+
+        def run():
+            bash = shutil.which("bash") or "bash"
+            return subprocess.run([bash, verify], input=b"{}", env=env, capture_output=True)
+
+        # 인터프리터가 없으면 테스트 실패로 오인해 차단하지 않고 경고만 남긴다
+        r = run()
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("python", r.stdout.decode("utf-8"))
+        # 실행 가능한 python 이 있으면 테스트를 실제로 돌린다 (임시 저장소엔 테스트 파일이 없어 실패 → 차단)
+        env["GUARD_PYTHON"] = sys.executable
+        self.assertEqual(run().returncode, 2)
+
     def test_heredoc_delimiter_with_dash(self):
         self.feature_branch()
         cmd = "python - <<'END-OF'\nprint('git push origin main')\nEND-OF\ngit status"
