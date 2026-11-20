@@ -96,7 +96,7 @@ Agent(subagent_type: "pr-reviewer",
 
 사용자가 "릴리스해줘", "main 에 올려줘" 라고 할 때만. main 머지는 CD(GHCR 이미지 배포)를 트리거한다.
 
-1. `git switch develop && git pull` (로컬 develop 은 읽기 전용 — 커밋하지 않는다)
+1. `git switch develop && git pull --ff-only origin develop` (로컬 develop 은 읽기 전용 — 커밋하지 않는다)
 2. `_workspace/` 를 `_workspace_<timestamp>/` 로 보관하고 새로 만든다. `01_plan.md` 에는 `git log --oneline origin/main..origin/develop` 로 이번 릴리스에 포함된 PR 목록을 적는다.
 3. qa-inspector — develop HEAD 기준 전체 QA(빌드 + 스모크)
 4. `gh pr create --base main --head develop` (hook 이 develop 에서만 main 을 base 로 허용)
