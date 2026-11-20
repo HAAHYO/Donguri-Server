@@ -11,14 +11,26 @@ max_attempts=3
 
 # 하네스 hook 을 바꿨으면 hook 회귀 테스트를 강제한다 (CI 와 같은 명령)
 if [ -n "$(git status --porcelain -- .claude/hooks 2>/dev/null)" ]; then
-  if ! hook_log="$(python .claude/hooks/test_guard_git.py 2>&1)"; then
+  # guard-git.sh 와 같은 방식: 존재가 아니라 "실제로 실행되는" python 을 고른다 (WindowsApps 스텁 회피)
+  py=""
+  if [ -n "${GUARD_PYTHON:-}" ]; then set -- "$GUARD_PYTHON"; else set -- python python3; fi  # 경로에 공백이 있어도 하나로 취급
+  for cand in "$@"; do
+    if "$cand" -c "import sys; sys.exit(0)" >/dev/null 2>&1; then
+      py="$cand"
+      break
+    fi
+  done
+  if [ -z "$py" ]; then
+    # 인터프리터 부재를 테스트 실패로 오인해 종료를 막지 않는다. CI 가 같은 테스트를 돌린다
+    echo '{"systemMessage": "verify hook: 실행 가능한 python 이 없어 hook 회귀 테스트를 건너뜁니다."}'
+  elif ! hook_log="$("$py" .claude/hooks/test_guard_git.py 2>&1)"; then
     # 이미 한 번 차단했는데 여전히 실패하면 루프를 피하고 경고만 남긴다
     if echo "$input" | grep -q '"stop_hook_active":[[:space:]]*true'; then
       echo '{"systemMessage": "verify hook: hook 회귀 테스트가 여전히 실패합니다. 직접 확인이 필요합니다."}'
       exit 0
     fi
     {
-      echo "hook 회귀 테스트 실패 (python .claude/hooks/test_guard_git.py). 아래 오류를 고친 뒤 다시 마무리하세요."
+      echo "hook 회귀 테스트 실패 (${py} .claude/hooks/test_guard_git.py). 아래 오류를 고친 뒤 다시 마무리하세요."
       echo "$hook_log" | grep -E "FAIL|ERROR|Error|assert" | tail -20
     } >&2
     exit 2
