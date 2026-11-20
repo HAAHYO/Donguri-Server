@@ -21,7 +21,8 @@ description: "Donguri 백엔드의 작업 전 과정 오케스트레이터 — �
 - `git add -A` / `.` / `--no-verify` 불가
 - 커밋 제목 형식 검사
 - `gh pr create` ← `_workspace/qa-report.md` 가 **현재 HEAD** 기준 `PASS` 여야 함
-- `gh pr merge` ← 추가로 `_workspace/review-report.md` 가 현재 HEAD 기준 `required_open=0` 이어야 함
+- `gh pr merge` ← 추가로 `_workspace/review-report.md` 가 현재 HEAD·해당 PR 기준 `required_open=0` 이어야 함
+- `gh api` 로 머지(`/pulls/N/merge`, `mergePullRequest` 등) 금지 — 게이트 우회 경로
 - Stop hook: `./gradlew check` 실패 시 종료 불가
 
 **리포트 마커를 직접 쓰거나 고치지 않는다.** `qa-report.md` 는 qa-inspector만, `review-report.md` 는 pr-reviewer만 작성한다. 메인 에이전트가 마커를 쓰는 순간 이 하네스 전체가 무의미해진다.
@@ -66,7 +67,7 @@ Agent(subagent_type: "qa-inspector",
 ## Phase 5: PR
 
 1. `git push -u origin <branch>`
-2. `gh pr create` — 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 형식을 채운다. 체크박스는 **실제로 확인한 것만** 체크하고, QA 리포트 요약과 "검증 안 됨"을 포함한다. 과장된 체크리스트는 혼자 보는 기록을 거짓으로 만든다.
+2. `gh pr create` — 본문은 `.github/pull_request_template.md` 형식을 채운다. 체크박스는 **실제로 확인한 것만** 체크하고, QA 리포트 요약과 "검증 안 됨"을 포함한다. 과장된 체크리스트는 혼자 보는 기록을 거짓으로 만든다.
 
 ## Phase 6: 셀프 리뷰
 
@@ -82,6 +83,8 @@ Agent(subagent_type: "pr-reviewer",
 2. qa-inspector 재검증 (코드가 바뀌었으니 이전 QA는 무효)
 3. pr-reviewer 재리뷰
 최대 3라운드. 그 후에도 필수가 남으면 사용자에게 넘긴다.
+
+**사용자 결정이 필요한 항목**은 사용자에게 묻고, 답을 `_workspace/decisions.md` 에 원문 그대로 기록한 뒤 재리뷰를 요청한다. 리뷰어가 그 기록을 확인해야만 항목이 닫힌다 — 그래야 마커를 고치거나 우회하지 않고도 머지 게이트를 통과할 수 있다.
 
 ## Phase 8: 머지
 

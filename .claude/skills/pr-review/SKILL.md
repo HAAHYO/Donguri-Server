@@ -58,10 +58,9 @@ gh pr diff <번호>
 
 diff를 읽은 뒤 반드시 주변 파일을 연다. 그 다음:
 
-**라인 코멘트** (한 번에 묶어서 리뷰로 게시 — 코멘트마다 알림이 가지 않도록):
+**라인 코멘트** (한 번에 묶어서 리뷰로 게시 — 코멘트마다 알림이 가지 않도록). payload는 **Write 도구로** `_workspace/review-payload.json` 에 쓴다(셸 heredoc 대신 — 한글/따옴표 이스케이프 문제와 권한 프롬프트를 피한다):
 
-```bash
-cat > _workspace/review-payload.json <<'EOF'
+```json
 {
   "commit_id": "<headRefOid>",
   "event": "COMMENT",
@@ -70,7 +69,9 @@ cat > _workspace/review-payload.json <<'EOF'
     {"path": "src/main/kotlin/com/donguri/...", "line": 42, "side": "RIGHT", "body": "(필수) ..."}
   ]
 }
-EOF
+```
+
+```bash
 gh api repos/HAAHYO/Donguri-Server/pulls/<번호>/reviews --input _workspace/review-payload.json
 ```
 
@@ -107,14 +108,19 @@ gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$
 ```markdown
 <!-- self-review pr=<번호> head=<headRefOid 전체 SHA> required_open=<열린 필수 수> -->
 # 셀프 리뷰 — PR #<번호> (라운드 n)
-| # | 심각도 | 위치 | 요약 | 상태 |
-|---|--------|------|------|------|
-| 1 | 필수 | AcornController.kt:18 | @Valid 누락 | OPEN / RESOLVED(<해시>) / DECLINED-수긍 / 사용자 결정 필요 |
+| # | 심각도 | 위치 | 요약 | thread id | comment id | 상태 |
+|---|--------|------|------|-----------|------------|------|
+| 1 | 필수 | AcornController.kt:18 | @Valid 누락 | PRRT_xxx | 123456 | OPEN / RESOLVED(<해시>) / DECLINED-수긍 / 사용자 결정 필요 / DECIDED(사용자) |
+| 2 | 필수 | (diff 밖) Foo.kt:40 | ... | — (요약 본문) | — | OPEN |
 ## 사용자 결정 필요
-- <쟁점> — 리뷰어 입장 / 작성자 입장
+- #<n> <쟁점> — 리뷰어 입장 / 작성자 입장
 ```
 
-`required_open` 은 상태가 OPEN 또는 "사용자 결정 필요"인 필수 코멘트 수다. 재리뷰 때는 표를 갱신하고 라운드를 올린다.
+- **thread id / comment id 를 반드시 적는다.** 작성자와 리뷰어가 같은 GitHub 계정이라 `author{login}` 으로 누가 쓴 코멘트인지 구분할 수 없다. 재리뷰는 이 id로 스레드를 찾는다.
+- diff 밖의 지적은 스레드가 없다. 작성자는 PR 일반 코멘트(`gh pr comment`)에 `#<n>` 을 붙여 답한다.
+- `required_open` 은 상태가 OPEN 또는 "사용자 결정 필요"인 필수 코멘트 수다. `DECIDED(사용자)` 는 세지 않는다.
+- **사용자 결정을 닫는 법:** 작성자(메인 에이전트)는 사용자에게 물어 받은 답을 `_workspace/decisions.md` 에 `#<n> <날짜> 사용자 결정: "<사용자 원문>"` 형식으로 기록한다. 재리뷰 때 리뷰어가 그 기록을 확인하고 상태를 `DECIDED(사용자)` 로 바꾼다. 기록 없이 닫지 않는다.
+- 재리뷰 때는 표를 갱신하고 라운드를 올린다.
 
 ## 규칙
 - `--approve` / `--request-changes` 쓰지 않는다 (event는 항상 `COMMENT`).
