@@ -25,7 +25,7 @@ jobs:
           java-version: 21
 
       # Gradle 캐시 + wrapper 검증(위조된 gradle-wrapper.jar 차단)
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@v5
 
       # 에이전트 하네스 hook(guard_git.py) 회귀 테스트
       - name: Harness tests
