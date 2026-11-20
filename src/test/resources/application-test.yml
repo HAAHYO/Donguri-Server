@@ -9,5 +9,7 @@ spring:
     show-sql: false
 
 fds:
+  jwt:
+    secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQta2V5LWZvci1kb25ndXJpLWZkcy0zMmJ5dGVz
   seed:
     employee-password: test-seed-password
