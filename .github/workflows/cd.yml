@@ -30,13 +30,13 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v6
 
       # 배포 전 게이트: CI와 같은 검증을 통과해야 이미지가 만들어진다
       - name: Check & build jar
         run: ./gradlew check bootJar --console=plain
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - uses: docker/login-action@v3
         with:
@@ -45,7 +45,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -53,7 +53,7 @@ jobs:
             type=semver,pattern={{version}}
             type=sha,format=short
 
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           push: true
