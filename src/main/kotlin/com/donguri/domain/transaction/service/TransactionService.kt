@@ -64,7 +64,7 @@ class TransactionService(
                     deviceChanged = request.deviceChanged,
                     fraudScore = result.fraudScore,
                     fdsStatus = result.status,
-                    shapReasons = jsonMapper.writeValueAsString(reasons),
+                    shapReasons = jsonMapper.writeValueAsString(result.topReasons.map { StoredShapReason(it.feature, it.shap) }),
                     occurredAt = occurredAt,
                 ),
             )
@@ -101,7 +101,10 @@ class TransactionService(
         return TransactionResponse.from(transaction, reasonsOf(transaction))
     }
 
-    private fun reasonsOf(transaction: Transaction): List<ShapReasonResponse> = jsonMapper.readValue(transaction.shapReasons)
+    private fun reasonsOf(transaction: Transaction): List<ShapReasonResponse> =
+        jsonMapper
+            .readValue<List<StoredShapReason>>(transaction.shapReasons)
+            .map { ShapReasonResponse(it.feature, it.shap) }
 
     companion object {
         private val CHURN_INCREASE =
@@ -113,3 +116,8 @@ class TransactionService(
         private const val MONEY_SCALE = 2
     }
 }
+
+internal data class StoredShapReason(
+    val feature: String,
+    val shap: BigDecimal,
+)
