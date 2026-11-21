@@ -22,6 +22,7 @@ enum class ErrorCode(
     TRANSACTION_ALREADY_JUDGED(HttpStatus.CONFLICT, "이미 판정이 끝난 거래입니다."),
     CARE_ACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "케어 조치를 찾을 수 없습니다."),
     CARE_ACTION_ALREADY_SENT(HttpStatus.CONFLICT, "이미 발송한 케어 조치입니다."),
+    CARE_ACTION_STALE(HttpStatus.CONFLICT, "케어 조치 내용이 변경되었습니다. 다시 확인한 뒤 발송해 주세요."),
     ;
 
     companion object {

@@ -10,14 +10,17 @@ import com.donguri.domain.employee.entity.EmployeeRole
 import com.donguri.domain.transaction.entity.FdsStatus
 import com.donguri.domain.transaction.entity.Transaction
 import com.donguri.domain.transaction.repository.TransactionRepository
+import com.donguri.domain.transaction.service.TransactionService
 import com.donguri.global.exception.CareActionAlreadySentException
 import com.donguri.global.security.jwt.JwtTokenProvider
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.patch
@@ -26,8 +29,11 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @SpringBootTest
@@ -35,6 +41,7 @@ import kotlin.test.assertTrue
 @ActiveProfiles("test")
 class CareActionConcurrencyTest(
     @Autowired private val careActionService: CareActionService,
+    @Autowired private val transactionService: TransactionService,
     @Autowired private val customerRepository: CustomerRepository,
     @Autowired private val transactionRepository: TransactionRepository,
     @Autowired private val careActionRepository: CareActionRepository,
@@ -61,7 +68,7 @@ class CareActionConcurrencyTest(
             (1..requests).map { index ->
                 pool.submit<Result<Unit>> {
                     start.await()
-                    runCatching { careActionService.send(careAction.id!!, "crm_$index") }.map { }
+                    runCatching { careActionService.send(careAction.id!!, 0, "crm_$index") }.map { }
                 }
             }
         start.countDown()
@@ -87,6 +94,8 @@ class CareActionConcurrencyTest(
                 .submit {
                     mockMvc
                         .patch("/api/care-actions/${careAction.id}/send") {
+                            contentType = MediaType.APPLICATION_JSON
+                            content = """{"version":0}"""
                             header(HttpHeaders.AUTHORIZATION, "Bearer $token")
                         }.andExpect {
                             status { isConflict() }
@@ -95,6 +104,30 @@ class CareActionConcurrencyTest(
                 }.get(15, TimeUnit.SECONDS)
         }
         pool.shutdown()
+    }
+
+    @Test
+    fun `오탐 판정은 진행 중인 발송이 끝나길 기다린 뒤 발송 결과 위에 케어 조치를 갱신한다`() {
+        val careAction = saveCareAction("110-222-000003")
+        val transactionId = careAction.transaction.id!!
+        val pool = Executors.newSingleThreadExecutor()
+        lateinit var resolving: Future<*>
+
+        transactionTemplate.executeWithoutResult {
+            val locked = careActionRepository.findByIdForUpdate(careAction.id!!)!!
+            locked.markSent("crm_marketer", 0)
+            careActionRepository.flush()
+            resolving = pool.submit { transactionService.resolveFalsePositive(transactionId) }
+            assertThrows<TimeoutException> { resolving.get(700, TimeUnit.MILLISECONDS) }
+        }
+        resolving.get(10, TimeUnit.SECONDS)
+        pool.shutdown()
+
+        val stored = careActionRepository.findById(careAction.id!!).get()
+        assertEquals(CareActionStatus.PENDING, stored.status)
+        assertNull(stored.sentBy)
+        assertEquals("우대금리 파킹통장 + 수수료 면제 쿠폰", stored.recommendedProduct)
+        assertEquals(2, stored.version)
     }
 
     private fun saveCareAction(accountNumber: String): CareAction {

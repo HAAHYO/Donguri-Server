@@ -5,6 +5,7 @@ import com.donguri.domain.customer.entity.Customer
 import com.donguri.domain.transaction.entity.Transaction
 import com.donguri.global.entity.BaseTimeEntity
 import com.donguri.global.exception.CareActionAlreadySentException
+import com.donguri.global.exception.CareActionStaleException
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -17,6 +18,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 
@@ -45,8 +47,17 @@ class CareAction(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
 
-    fun markSent(username: String) {
+    @Version
+    @Column(nullable = false)
+    var version: Long = 0
+        protected set
+
+    fun markSent(
+        username: String,
+        expectedVersion: Long,
+    ) {
         if (status == CareActionStatus.SENT) throw CareActionAlreadySentException()
+        if (version != expectedVersion) throw CareActionStaleException()
         status = CareActionStatus.SENT
         sentBy = username
     }

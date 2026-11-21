@@ -21,6 +21,7 @@ data class CareActionResponse(
     val actionMessage: String,
     val status: CareActionStatus,
     val sentBy: String?,
+    val version: Long,
 ) {
     companion object {
         fun from(careAction: CareAction) =
@@ -37,6 +38,7 @@ data class CareActionResponse(
                 actionMessage = careAction.actionMessage,
                 status = careAction.status,
                 sentBy = careAction.sentBy,
+                version = careAction.version,
             )
     }
 }

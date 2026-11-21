@@ -3,6 +3,7 @@ package com.donguri.domain.careaction.controller
 import com.donguri.domain.careaction.entity.CareAction
 import com.donguri.domain.careaction.entity.CareActionStatus
 import com.donguri.domain.careaction.repository.CareActionRepository
+import com.donguri.domain.careaction.service.CareRecommendation
 import com.donguri.domain.customer.entity.Customer
 import com.donguri.domain.customer.entity.CustomerGrade
 import com.donguri.domain.customer.repository.CustomerRepository
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.ResultActionsDsl
@@ -25,6 +27,7 @@ import org.springframework.test.web.servlet.patch
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -62,6 +65,7 @@ class CareActionControllerTest(
             jsonPath("$.items[0].actionMessage") { value("불편을 드려 죄송합니다.") }
             jsonPath("$.items[0].status") { value("PENDING") }
             jsonPath("$.items[0].sentBy") { value(null) }
+            jsonPath("$.items[0].version") { value(0) }
         }
     }
 
@@ -93,6 +97,8 @@ class CareActionControllerTest(
             jsonPath("$.status") { value("SENT") }
             jsonPath("$.sentBy") { value("crm_marketer") }
             jsonPath("$.customerName") { value("김*수") }
+            jsonPath("$.accountNumber") { value("110-***-000004") }
+            jsonPath("$.version") { value(1) }
         }
 
         em.flush()
@@ -113,7 +119,49 @@ class CareActionControllerTest(
             jsonPath("$.code") { value("CARE_ACTION_ALREADY_SENT") }
         }
 
+        em.flush()
+        em.clear()
         assertEquals("crm_marketer", careActionRepository.findById(careAction.id!!).get().sentBy)
+    }
+
+    @Test
+    fun `조회 후 내용이 바뀐 케어 조치는 409 이고 최신 버전으로만 발송할 수 있다`() {
+        val careAction = careAction("110-111-000007")
+        careAction.replan(CareRecommendation("수수료 면제", "새 안내 메시지입니다."))
+        careActionRepository.saveAndFlush(careAction)
+
+        send(careAction.id!!, marketer, version = 0).andExpect {
+            status { isConflict() }
+            jsonPath("$.code") { value("CARE_ACTION_STALE") }
+        }
+        em.flush()
+        em.clear()
+        val unchanged = careActionRepository.findById(careAction.id!!).get()
+        assertEquals(CareActionStatus.PENDING, unchanged.status)
+        assertNull(unchanged.sentBy)
+
+        send(careAction.id!!, marketer, version = 1).andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("SENT") }
+            jsonPath("$.actionMessage") { value("새 안내 메시지입니다.") }
+        }
+    }
+
+    @Test
+    fun `발송 요청에 올바른 version 이 없으면 400 이다`() {
+        val careAction = careAction("110-111-000008")
+
+        listOf("{}", """{"version":-1}""", "not-json").forEach { content ->
+            mockMvc
+                .patch("/api/care-actions/${careAction.id}/send") {
+                    contentType = MediaType.APPLICATION_JSON
+                    this.content = content
+                    header(HttpHeaders.AUTHORIZATION, "Bearer $marketer")
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value("INVALID_INPUT") }
+                }
+        }
     }
 
     @Test
@@ -184,8 +232,11 @@ class CareActionControllerTest(
     private fun send(
         id: Long,
         token: String?,
+        version: Long = 0,
     ): ResultActionsDsl =
         mockMvc.patch("/api/care-actions/$id/send") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"version":$version}"""
             token?.let { header(HttpHeaders.AUTHORIZATION, "Bearer $it") }
         }
 }

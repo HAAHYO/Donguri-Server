@@ -17,10 +17,12 @@ class CareActionService(
     @Transactional
     fun send(
         id: Long,
+        expectedVersion: Long,
         username: String,
     ): CareActionResponse {
         val careAction = careActionRepository.findByIdForUpdate(id) ?: throw CareActionNotFoundException()
-        careAction.markSent(username)
+        careAction.markSent(username, expectedVersion)
+        careActionRepository.flush()
         return CareActionResponse.from(careAction)
     }
 }
