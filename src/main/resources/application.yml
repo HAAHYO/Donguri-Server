@@ -27,3 +27,20 @@ springdoc:
   swagger-ui:
     enabled: false
     path: /swagger-ui.html
+
+---
+spring:
+  config:
+    activate:
+      on-profile: "local & !prod"
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
