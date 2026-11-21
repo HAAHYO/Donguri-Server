@@ -1,16 +1,16 @@
 package com.donguri.global.entity
 
-import com.donguri.careaction.CareAction
-import com.donguri.careaction.CareActionRepository
-import com.donguri.customer.Customer
-import com.donguri.customer.CustomerGrade
-import com.donguri.customer.CustomerRepository
-import com.donguri.employee.Employee
-import com.donguri.employee.EmployeeRepository
-import com.donguri.employee.EmployeeRole
-import com.donguri.transaction.FdsStatus
-import com.donguri.transaction.Transaction
-import com.donguri.transaction.TransactionRepository
+import com.donguri.domain.careaction.entity.CareAction
+import com.donguri.domain.careaction.repository.CareActionRepository
+import com.donguri.domain.customer.entity.Customer
+import com.donguri.domain.customer.entity.CustomerGrade
+import com.donguri.domain.customer.repository.CustomerRepository
+import com.donguri.domain.employee.entity.Employee
+import com.donguri.domain.employee.entity.EmployeeRole
+import com.donguri.domain.employee.repository.EmployeeRepository
+import com.donguri.domain.transaction.entity.FdsStatus
+import com.donguri.domain.transaction.entity.Transaction
+import com.donguri.domain.transaction.repository.TransactionRepository
 import jakarta.persistence.EntityManager
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows

@@ -27,23 +27,28 @@ Boot 4는 자동설정과 테스트 슬라이스가 모듈별로 쪼개져 impor
 
 ```
 com.donguri
-├── <domain>/                 예: acorn/
-│   ├── <Domain>Controller.kt
-│   ├── <Domain>Service.kt
-│   ├── <Domain>.kt           도메인 모델/엔티티
-│   ├── <Domain>Repository.kt JpaRepository. Enum 은 타입마다 별도 파일 (예: EmployeeRole.kt, FdsStatus.kt)
-│   ├── <Domain>Exception.kt
-│   └── dto/                  <Action>Request.kt, <Domain>Response.kt
+├── domain/
+│   └── <domain>/             예: transaction/
+│       ├── controller/       <Domain>Controller.kt
+│       ├── service/          <Domain>Service.kt, 정책/엔진(예: FdsScoringEngine, RuleBasedFdsScoringEngine)
+│       ├── repository/       <Domain>Repository.kt (JpaRepository)
+│       ├── entity/           엔티티, Enum (타입마다 별도 파일. 예: Transaction.kt, FdsStatus.kt)
+│       └── dto/
+│           ├── request/      <Action>Request.kt
+│           └── response/     <Domain>Response.kt, <Domain>ListResponse.kt
 └── global/
+    ├── config/               SecurityConfig, SwaggerConfig, ClockConfig
     ├── entity/               BaseTimeEntity (createdAt/updatedAt, Hibernate 자동 기록)
+    ├── exception/            ErrorCode, DonguriException, GlobalExceptionHandler, ProblemDetails, <Domain>Exception.kt
     ├── init/                 DataInitializer (local 프로필 시딩)
-    ├── security/             SecurityConfig, JwtTokenProvider, JwtAuthenticationFilter
-    ├── util/                 MaskingUtil
-    ├── error/                ErrorCode, DonguriException, GlobalExceptionHandler
-    └── config/
+    ├── security/             JwtPrincipal
+    │   └── jwt/              JwtTokenProvider, JwtAuthenticationFilter, JwtProperties
+    └── util/                 MaskingUtil
 ```
 
-도메인별 패키지(package-by-feature). 레이어별 최상위 패키지(`controller/`, `service/`)를 만들지 않는다.
+도메인별 패키지(`domain/<domain>`) 안에서 레이어별 하위 패키지로 나눈다(VOID-GSM/TaekBaeWatShong_SERVER 구조를 따름). 최상위에 레이어 패키지(`com.donguri.controller`)를 만들지 않는다.
+- 도메인 예외 클래스는 `global/exception/<Domain>Exception.kt` 에 도메인별로 모은다(클래스가 하나뿐이면 ktlint 규칙상 파일 이름은 클래스 이름).
+- 테스트는 대상 클래스와 같은 패키지에 둔다.
 
 ## 레이어 역할
 
@@ -58,12 +63,12 @@ com.donguri
 
 ```kotlin
 enum class ErrorCode(val status: HttpStatus, val message: String) {
-    ACORN_NOT_FOUND(HttpStatus.NOT_FOUND, "도토리를 찾을 수 없습니다."),
+    TRANSACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "거래를 찾을 수 없습니다."),
 }
 
 open class DonguriException(val errorCode: ErrorCode) : RuntimeException(errorCode.message)
 
-class AcornNotFoundException : DonguriException(ErrorCode.ACORN_NOT_FOUND)
+class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_FOUND)
 ```
 
 - `GlobalExceptionHandler`(`@RestControllerAdvice`)가 `DonguriException` 과 검증 실패(`MethodArgumentNotValidException`)를 `ProblemDetail`(RFC 9457) + `code` 속성으로 변환한다. 첫 엔드포인트를 만들 때 함께 도입한다.
@@ -98,6 +103,8 @@ class AcornNotFoundException : DonguriException(ErrorCode.ACORN_NOT_FOUND)
   - 그래도 Hibernate 는 허용 값 CHECK 제약(`col in ('A','B')`)을 만든다(`AttributeConverter` 를 써도 동일, Hibernate 7). `ddl-auto: update` 는 이 제약을 고치지 않는다. **Enum 상수를 추가하면 같은 PR 에서 기존 DB 의 CHECK 제약을 바꾸는 SQL 을 PR 본문에 적는다** — 마이그레이션 도구(Flyway) 도입 전까지의 규칙.
 - 엔티티를 컨트롤러 응답으로 반환하지 않는다(위 레이어 역할). `open-in-view` 는 꺼져 있으므로 지연 로딩은 서비스의 트랜잭션 안에서 끝낸다.
 - 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`) + `@AutoConfigureTestDatabase(replace = NONE)` + `@ActiveProfiles("test")` — 임의 내장 DB 가 아니라 test 프로필의 H2 MySQL 모드로 검증한다.
+- 잔액·점수처럼 동시 요청이 같은 행을 바꾸는 로직은 `findByIdForUpdate`(`PESSIMISTIC_WRITE` + `lock.timeout`)로 읽고, 동시성 테스트(커밋되는 실제 트랜잭션, 스레드 풀)로 증명한다. 락 대기 초과는 409 `LOCK_CONFLICT`.
+- 금액은 `setScale(2)`, 점수는 `setScale(4)` 로 정규화해서 저장·응답한다.
 - `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
 
 ## 보안

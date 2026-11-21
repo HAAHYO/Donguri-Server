@@ -1,6 +1,6 @@
 package com.donguri.global.security
 
-import com.donguri.employee.EmployeeRole
+import com.donguri.domain.employee.entity.EmployeeRole
 import org.springframework.security.core.AuthenticatedPrincipal
 
 data class JwtPrincipal(

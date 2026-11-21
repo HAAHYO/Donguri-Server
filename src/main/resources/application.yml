@@ -2,7 +2,7 @@ spring:
   application:
     name: donguri
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/fds_bank?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/fds_bank?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&sessionVariables=innodb_lock_wait_timeout=3}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
   jpa:

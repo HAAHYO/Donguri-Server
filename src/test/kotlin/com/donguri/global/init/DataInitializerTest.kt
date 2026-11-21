@@ -1,9 +1,9 @@
 package com.donguri.global.init
 
-import com.donguri.customer.CustomerRepository
-import com.donguri.employee.EmployeeRepository
-import com.donguri.transaction.FdsStatus
-import com.donguri.transaction.TransactionRepository
+import com.donguri.domain.customer.repository.CustomerRepository
+import com.donguri.domain.employee.repository.EmployeeRepository
+import com.donguri.domain.transaction.entity.FdsStatus
+import com.donguri.domain.transaction.repository.TransactionRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments

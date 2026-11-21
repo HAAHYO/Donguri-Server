@@ -1,6 +1,6 @@
 package com.donguri.global.util
 
-import com.donguri.employee.EmployeeRole
+import com.donguri.domain.employee.entity.EmployeeRole
 import com.donguri.global.security.JwtPrincipal
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test

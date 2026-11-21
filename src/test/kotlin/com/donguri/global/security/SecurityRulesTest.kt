@@ -1,6 +1,7 @@
 package com.donguri.global.security
 
-import com.donguri.employee.EmployeeRole
+import com.donguri.domain.employee.entity.EmployeeRole
+import com.donguri.global.security.jwt.JwtTokenProvider
 import io.jsonwebtoken.Jwts
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
