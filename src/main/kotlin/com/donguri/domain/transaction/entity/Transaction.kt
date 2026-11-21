@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.Lob
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import org.hibernate.Length
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
@@ -42,7 +43,7 @@ class Transaction(
     @Column
     var isActualFraud: Boolean? = null,
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, length = Length.LONG32)
     var shapReasons: String,
     @Column
     val occurredAt: LocalDateTime? = null,
