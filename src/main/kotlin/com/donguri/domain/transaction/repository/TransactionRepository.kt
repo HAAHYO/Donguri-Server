@@ -1,4 +1,5 @@
 package com.donguri.domain.transaction.repository
+
 import com.donguri.domain.transaction.entity.Transaction
 import jakarta.persistence.LockModeType
 import jakarta.persistence.QueryHint
@@ -13,6 +14,6 @@ interface TransactionRepository : JpaRepository<Transaction, Long> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
-    @Query("select t from Transaction t join fetch t.customer where t.id = :id")
+    @Query("select t from Transaction t where t.id = :id")
     fun findByIdForUpdate(id: Long): Transaction?
 }
