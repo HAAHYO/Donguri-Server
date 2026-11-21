@@ -184,6 +184,8 @@ class CareActionControllerTest(
             jsonPath("$.code") { value("UNAUTHORIZED") }
         }
         assertEquals(CareActionStatus.PENDING, careActionRepository.findById(careAction.id!!).get().status)
+        val histories = em.createNativeQuery("select count(*) from care_action_send_history").singleResult as Number
+        assertEquals(0L, histories.toLong())
     }
 
     @Test
