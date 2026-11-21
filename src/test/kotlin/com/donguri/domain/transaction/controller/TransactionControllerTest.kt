@@ -1,4 +1,5 @@
 package com.donguri.domain.transaction.controller
+
 import com.donguri.domain.careaction.entity.CareAction
 import com.donguri.domain.careaction.entity.CareActionStatus
 import com.donguri.domain.careaction.repository.CareActionRepository
@@ -25,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.math.BigDecimal
+import java.time.LocalDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -101,15 +103,38 @@ class TransactionControllerTest(
     fun `없는 고객은 404, 잘못된 금액과 본문은 400, 토큰 없으면 401 이다`() {
         val customer = customer()
 
-        simulate(999_999, "1000").andExpect { jsonPath("$.code") { value("CUSTOMER_NOT_FOUND") } }
+        simulate(999_999, "1000").andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("CUSTOMER_NOT_FOUND") }
+        }
         listOf("0", "-100", "10.123").forEach { amount ->
             simulate(customer.id, amount).andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("INVALID_INPUT") }
             }
         }
-        post("/api/transactions/simulate", """{"amount":1000}""", admin).andExpect { status { isBadRequest() } }
-        simulate(customer.id, "1000", token = null).andExpect { status { isUnauthorized() } }
+        listOf("""{"amount":1000}""", """{"customerId":${customer.id}}""", "not-json").forEach { content ->
+            post("/api/transactions/simulate", content, admin).andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_INPUT") }
+            }
+        }
+        simulate(customer.id, "1000", token = null).andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("UNAUTHORIZED") }
+        }
+    }
+
+    @Test
+    fun `occurredAt 을 생략하면 현재 시각을 기록하고 txHour 는 그 시각에서 계산한다`() {
+        val customer = customer()
+
+        val body =
+            post("/api/transactions/simulate", """{"customerId":${customer.id},"amount":1000}""", admin)
+                .andExpect { status { isCreated() } }
+                .body()
+
+        assertEquals(LocalDateTime.parse(body["occurredAt"].asString()).hour, body["txHour"].asInt())
     }
 
     @Test
@@ -179,7 +204,10 @@ class TransactionControllerTest(
             status { isForbidden() }
             jsonPath("$.code") { value("ACCESS_DENIED") }
         }
-        resolve(blockedTxId, null).andExpect { status { isUnauthorized() } }
+        resolve(blockedTxId, null).andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("UNAUTHORIZED") }
+        }
         resolve(blockedTxId, admin).andExpect { status { isOk() } }
         resolve(blockedTxId, admin).andExpect {
             status { isConflict() }
