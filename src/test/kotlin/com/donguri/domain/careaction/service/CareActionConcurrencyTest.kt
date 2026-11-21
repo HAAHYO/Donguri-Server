@@ -22,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.patch
@@ -47,6 +48,7 @@ class CareActionConcurrencyTest(
     @Autowired private val transactionRepository: TransactionRepository,
     @Autowired private val careActionRepository: CareActionRepository,
     @Autowired private val sendHistoryRepository: CareActionSendHistoryRepository,
+    @Autowired private val jdbcTemplate: JdbcTemplate,
     @Autowired private val transactionManager: PlatformTransactionManager,
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val jwtTokenProvider: JwtTokenProvider,
@@ -55,7 +57,7 @@ class CareActionConcurrencyTest(
 
     @AfterEach
     fun cleanUp() {
-        sendHistoryRepository.deleteAll()
+        jdbcTemplate.update("delete from care_action_send_history")
         careActionRepository.deleteAll()
         transactionRepository.deleteAll()
         customerRepository.deleteAll()
