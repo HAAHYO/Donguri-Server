@@ -13,6 +13,7 @@ import com.donguri.domain.transaction.entity.FdsStatus
 import com.donguri.domain.transaction.entity.Transaction
 import com.donguri.domain.transaction.repository.TransactionRepository
 import com.donguri.global.exception.CustomerNotFoundException
+import com.donguri.global.exception.InvalidOccurredAtException
 import com.donguri.global.exception.TransactionAlreadyJudgedException
 import com.donguri.global.exception.TransactionNotBlockedException
 import com.donguri.global.exception.TransactionNotFoundException
@@ -24,6 +25,8 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Clock
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 @Service
 class TransactionService(
@@ -38,7 +41,7 @@ class TransactionService(
     fun simulate(request: SimulateTransactionRequest): SimulateTransactionResponse {
         val customer = customerRepository.findByIdForUpdate(request.customerId) ?: throw CustomerNotFoundException()
         val amount = request.amount.setScale(MONEY_SCALE, RoundingMode.UNNECESSARY)
-        val occurredAt = request.occurredAt?.atZoneSameInstant(clock.zone)?.toLocalDateTime() ?: LocalDateTime.now(clock)
+        val occurredAt = resolveOccurredAt(request.occurredAt)
         val result =
             scoringEngine.score(
                 FdsScoringInput(
@@ -101,6 +104,12 @@ class TransactionService(
         return TransactionResponse.from(transaction, reasonsOf(transaction))
     }
 
+    private fun resolveOccurredAt(value: OffsetDateTime?): LocalDateTime {
+        if (value == null) return LocalDateTime.now(clock)
+        if (value.isBefore(MIN_OCCURRED_AT) || !value.isBefore(MAX_OCCURRED_AT)) throw InvalidOccurredAtException()
+        return value.atZoneSameInstant(clock.zone).toLocalDateTime()
+    }
+
     private fun reasonsOf(transaction: Transaction): List<ShapReasonResponse> =
         jsonMapper
             .readValue<List<StoredShapReason>>(transaction.shapReasons)
@@ -114,6 +123,8 @@ class TransactionService(
             )
         private val FALSE_POSITIVE_CHURN_INCREASE = BigDecimal("0.30")
         private const val MONEY_SCALE = 2
+        private val MIN_OCCURRED_AT = OffsetDateTime.of(2000, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
+        private val MAX_OCCURRED_AT = OffsetDateTime.of(2100, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
     }
 }
 

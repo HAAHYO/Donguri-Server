@@ -162,6 +162,26 @@ class TransactionControllerTest(
     }
 
     @Test
+    fun `occurredAt 은 2000년 이상 2100년 미만만 허용한다`() {
+        val customer = customer()
+
+        listOf("2000-01-01T00:00:00Z", "2099-12-31T23:59:59Z").forEach { occurredAt ->
+            simulate(customer.id, "1000", occurredAt = occurredAt).andExpect { status { isCreated() } }
+        }
+        listOf(
+            "1999-12-31T23:59:59Z",
+            "2100-01-01T00:00:00Z",
+            "+999999999-12-31T23:59:59Z",
+            "-999999999-01-01T00:00:00+18:00",
+        ).forEach { occurredAt ->
+            simulate(customer.id, "1000", occurredAt = occurredAt).andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_INPUT") }
+            }
+        }
+    }
+
+    @Test
     fun `OpenAPI 문서의 필드 이름은 실제 JSON 키와 같다`() {
         mockMvc.get("/v3/api-docs").andExpect {
             status { isOk() }
