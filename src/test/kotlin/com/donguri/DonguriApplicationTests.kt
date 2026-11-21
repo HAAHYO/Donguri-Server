@@ -1,6 +1,6 @@
 package com.donguri
 
-import com.donguri.employee.EmployeeRepository
+import com.donguri.domain.employee.repository.EmployeeRepository
 import com.donguri.global.init.DataInitializer
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

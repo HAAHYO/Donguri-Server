@@ -1,14 +1,14 @@
 package com.donguri.global.init
 
-import com.donguri.customer.Customer
-import com.donguri.customer.CustomerGrade
-import com.donguri.customer.CustomerRepository
-import com.donguri.employee.Employee
-import com.donguri.employee.EmployeeRepository
-import com.donguri.employee.EmployeeRole
-import com.donguri.transaction.FdsStatus
-import com.donguri.transaction.Transaction
-import com.donguri.transaction.TransactionRepository
+import com.donguri.domain.customer.entity.Customer
+import com.donguri.domain.customer.entity.CustomerGrade
+import com.donguri.domain.customer.repository.CustomerRepository
+import com.donguri.domain.employee.entity.Employee
+import com.donguri.domain.employee.entity.EmployeeRole
+import com.donguri.domain.employee.repository.EmployeeRepository
+import com.donguri.domain.transaction.entity.FdsStatus
+import com.donguri.domain.transaction.entity.Transaction
+import com.donguri.domain.transaction.repository.TransactionRepository
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.ApplicationArguments

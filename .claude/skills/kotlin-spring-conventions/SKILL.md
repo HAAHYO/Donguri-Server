@@ -27,23 +27,28 @@ Boot 4는 자동설정과 테스트 슬라이스가 모듈별로 쪼개져 impor
 
 ```
 com.donguri
-├── <domain>/                 예: acorn/
-│   ├── <Domain>Controller.kt
-│   ├── <Domain>Service.kt
-│   ├── <Domain>.kt           도메인 모델/엔티티
-│   ├── <Domain>Repository.kt JpaRepository. Enum 은 타입마다 별도 파일 (예: EmployeeRole.kt, FdsStatus.kt)
-│   ├── <Domain>Exception.kt
-│   └── dto/                  <Action>Request.kt, <Domain>Response.kt
+├── domain/
+│   └── <domain>/             예: transaction/
+│       ├── controller/       <Domain>Controller.kt
+│       ├── service/          <Domain>Service.kt, 정책/엔진(예: FdsScoringEngine, RuleBasedFdsScoringEngine)
+│       ├── repository/       <Domain>Repository.kt (JpaRepository)
+│       ├── entity/           엔티티, Enum (타입마다 별도 파일. 예: Transaction.kt, FdsStatus.kt)
+│       └── dto/
+│           ├── request/      <Action>Request.kt
+│           └── response/     <Domain>Response.kt, <Domain>ListResponse.kt
 └── global/
+    ├── config/               SecurityConfig, SwaggerConfig, ClockConfig
     ├── entity/               BaseTimeEntity (createdAt/updatedAt, Hibernate 자동 기록)
+    ├── exception/            ErrorCode, DonguriException, GlobalExceptionHandler, ProblemDetails, <Domain>Exception.kt
     ├── init/                 DataInitializer (local 프로필 시딩)
-    ├── security/             SecurityConfig, JwtTokenProvider, JwtAuthenticationFilter
-    ├── util/                 MaskingUtil
-    ├── error/                ErrorCode, DonguriException, GlobalExceptionHandler
-    └── config/
+    ├── security/             JwtPrincipal
+    │   └── jwt/              JwtTokenProvider, JwtAuthenticationFilter, JwtProperties
+    └── util/                 MaskingUtil
 ```
 
-도메인별 패키지(package-by-feature). 레이어별 최상위 패키지(`controller/`, `service/`)를 만들지 않는다.
+도메인별 패키지(`domain/<domain>`) 안에서 레이어별 하위 패키지로 나눈다(VOID-GSM/TaekBaeWatShong_SERVER 구조를 따름). 최상위에 레이어 패키지(`com.donguri.controller`)를 만들지 않는다.
+- 도메인 예외 클래스는 `global/exception/<Domain>Exception.kt` 에 도메인별로 모은다(클래스가 하나뿐이면 ktlint 규칙상 파일 이름은 클래스 이름).
+- 테스트는 대상 클래스와 같은 패키지에 둔다.
 
 ## 레이어 역할
 
@@ -58,12 +63,12 @@ com.donguri
 
 ```kotlin
 enum class ErrorCode(val status: HttpStatus, val message: String) {
-    ACORN_NOT_FOUND(HttpStatus.NOT_FOUND, "도토리를 찾을 수 없습니다."),
+    TRANSACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "거래를 찾을 수 없습니다."),
 }
 
 open class DonguriException(val errorCode: ErrorCode) : RuntimeException(errorCode.message)
 
-class AcornNotFoundException : DonguriException(ErrorCode.ACORN_NOT_FOUND)
+class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_FOUND)
 ```
 
 - `GlobalExceptionHandler`(`@RestControllerAdvice`)가 `DonguriException` 과 검증 실패(`MethodArgumentNotValidException`)를 `ProblemDetail`(RFC 9457) + `code` 속성으로 변환한다. 첫 엔드포인트를 만들 때 함께 도입한다.
