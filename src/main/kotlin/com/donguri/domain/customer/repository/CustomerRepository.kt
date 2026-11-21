@@ -1,4 +1,5 @@
 package com.donguri.domain.customer.repository
+
 import com.donguri.domain.customer.entity.Customer
 import jakarta.persistence.LockModeType
 import jakarta.persistence.QueryHint

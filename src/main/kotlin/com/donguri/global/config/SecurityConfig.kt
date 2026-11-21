@@ -1,4 +1,5 @@
 package com.donguri.global.config
+
 import com.donguri.global.exception.DonguriException
 import com.donguri.global.exception.ErrorCode
 import com.donguri.global.security.jwt.JwtAuthenticationFilter

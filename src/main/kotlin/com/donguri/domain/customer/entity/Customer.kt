@@ -1,4 +1,5 @@
 package com.donguri.domain.customer.entity
+
 import com.donguri.global.entity.BaseTimeEntity
 import com.donguri.global.exception.InsufficientBalanceException
 import jakarta.persistence.Column

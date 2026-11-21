@@ -1,4 +1,5 @@
 package com.donguri.domain.transaction.service
+
 import com.donguri.domain.careaction.entity.CareAction
 import com.donguri.domain.careaction.repository.CareActionRepository
 import com.donguri.domain.careaction.service.CareRecommendation

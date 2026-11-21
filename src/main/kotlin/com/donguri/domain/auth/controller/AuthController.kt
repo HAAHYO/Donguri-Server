@@ -1,4 +1,5 @@
 package com.donguri.domain.auth.controller
+
 import com.donguri.domain.auth.dto.request.LoginRequest
 import com.donguri.domain.auth.dto.response.LoginResponse
 import com.donguri.domain.auth.service.AuthService
