@@ -108,7 +108,8 @@ class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_
 - `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
 - 스키마는 Flyway 가 관리한다. 엔티티를 바꾸면 같은 PR 에 `src/main/resources/db/migration/V<n>__<설명>.sql` 을 추가하고, 이미 적용된 마이그레이션은 고치지 않는다. Hibernate 는 `ddl-auto: validate` 로 일치 여부만 검사한다.
 - 마이그레이션은 MySQL 8 과 H2 MySQL 모드 양쪽에서 실행되는 SQL 로 쓴다. 테스트도 같은 마이그레이션으로 기동한다.
-- SQL 로그와 Swagger 는 `local`, `test` 프로필에서만 켠다. 프로필이 없거나 `prod` 면 꺼져 있다.
+- SQL 로그는 `local`, Swagger 는 `local`·`test` 에서만 켠다. 프로필이 없거나 `prod` 면 꺼져 있고, `prod` 와 `local` 이 함께 켜져도 `prod` 가 우선한다(`local & !prod`). 시딩도 같은 조건이다.
+- `FlywaySchemaConsistencyTest` 가 마이그레이션과 엔티티의 컬럼, nullable, 길이, 정밀도, unique, Enum CHECK 를 비교한다.
 
 ## 보안
 
