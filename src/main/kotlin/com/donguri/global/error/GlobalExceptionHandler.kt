@@ -1,6 +1,7 @@
 package com.donguri.global.error
 
 import org.slf4j.LoggerFactory
+import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatusCode
 import org.springframework.http.ProblemDetail
@@ -20,6 +21,12 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
     @ExceptionHandler(DonguriException::class)
     fun handleDonguri(e: DonguriException): ResponseEntity<ProblemDetail> = respond(ProblemDetails.of(e.errorCode))
+
+    @ExceptionHandler(PessimisticLockingFailureException::class)
+    fun handleLockConflict(e: PessimisticLockingFailureException): ResponseEntity<ProblemDetail> {
+        log.warn("비관적 락 획득 실패: {}", e.message)
+        return respond(ProblemDetails.of(ErrorCode.LOCK_CONFLICT))
+    }
 
     @ExceptionHandler(AccessDeniedException::class, AuthenticationException::class)
     fun passToSecurity(e: RuntimeException): Nothing = throw e
