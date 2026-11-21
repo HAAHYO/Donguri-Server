@@ -95,7 +95,7 @@ class TransactionService(
         customer.increaseChurnScore(FALSE_POSITIVE_CHURN_INCREASE)
 
         val recommendation = CareRecommendation.forFalsePositive(customer)
-        val careAction = careActionRepository.findByTransaction(transaction)
+        val careAction = careActionRepository.findByTransactionForUpdate(transaction)
         if (careAction == null) {
             careActionRepository.save(CareAction(transaction, recommendation.product, recommendation.message))
         } else {

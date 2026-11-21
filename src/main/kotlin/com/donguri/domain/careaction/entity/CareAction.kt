@@ -4,6 +4,7 @@ import com.donguri.domain.careaction.service.CareRecommendation
 import com.donguri.domain.customer.entity.Customer
 import com.donguri.domain.transaction.entity.Transaction
 import com.donguri.global.entity.BaseTimeEntity
+import com.donguri.global.exception.CareActionAlreadySentException
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -43,6 +44,12 @@ class CareAction(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
+
+    fun markSent(username: String) {
+        if (status == CareActionStatus.SENT) throw CareActionAlreadySentException()
+        status = CareActionStatus.SENT
+        sentBy = username
+    }
 
     fun replan(recommendation: CareRecommendation) {
         recommendedProduct = recommendation.product

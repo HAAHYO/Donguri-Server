@@ -20,6 +20,8 @@ enum class ErrorCode(
     TRANSACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "거래를 찾을 수 없습니다."),
     TRANSACTION_NOT_BLOCKED(HttpStatus.CONFLICT, "차단된 거래만 오탐으로 판정할 수 있습니다."),
     TRANSACTION_ALREADY_JUDGED(HttpStatus.CONFLICT, "이미 판정이 끝난 거래입니다."),
+    CARE_ACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "케어 조치를 찾을 수 없습니다."),
+    CARE_ACTION_ALREADY_SENT(HttpStatus.CONFLICT, "이미 발송한 케어 조치입니다."),
     ;
 
     companion object {
