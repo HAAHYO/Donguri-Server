@@ -3,6 +3,7 @@ package com.donguri.domain.careaction.controller
 import com.donguri.domain.careaction.dto.request.SendCareActionRequest
 import com.donguri.domain.careaction.dto.response.CareActionListResponse
 import com.donguri.domain.careaction.dto.response.CareActionResponse
+import com.donguri.domain.careaction.dto.response.CareActionSendHistoryListResponse
 import com.donguri.domain.careaction.service.CareActionService
 import com.donguri.global.security.JwtPrincipal
 import io.swagger.v3.oas.annotations.Operation
@@ -26,6 +27,13 @@ class CareActionController(
     @PreAuthorize("hasAnyRole('FDS_ADMIN', 'CRM_MARKETER')")
     @GetMapping
     fun findAll(): CareActionListResponse = careActionService.findAll()
+
+    @Operation(summary = "케어 조치 발송 이력 조회", description = "최신순. 오탐 판정으로 케어 조치가 다시 대기 상태가 되어도 이력은 유지된다")
+    @PreAuthorize("hasAnyRole('FDS_ADMIN', 'CRM_MARKETER')")
+    @GetMapping("/{id}/send-history")
+    fun findSendHistory(
+        @PathVariable id: Long,
+    ): CareActionSendHistoryListResponse = careActionService.findSendHistory(id)
 
     @Operation(summary = "케어 조치 발송 처리", description = "조회한 version 이 최신일 때만 SENT 로 바꾸고 발송자를 기록한다. 실제 메시지는 보내지 않는다")
     @PreAuthorize("hasRole('CRM_MARKETER')")

@@ -3,6 +3,7 @@ package com.donguri.domain.careaction.service
 import com.donguri.domain.careaction.entity.CareAction
 import com.donguri.domain.careaction.entity.CareActionStatus
 import com.donguri.domain.careaction.repository.CareActionRepository
+import com.donguri.domain.careaction.repository.CareActionSendHistoryRepository
 import com.donguri.domain.customer.entity.Customer
 import com.donguri.domain.customer.entity.CustomerGrade
 import com.donguri.domain.customer.repository.CustomerRepository
@@ -45,6 +46,7 @@ class CareActionConcurrencyTest(
     @Autowired private val customerRepository: CustomerRepository,
     @Autowired private val transactionRepository: TransactionRepository,
     @Autowired private val careActionRepository: CareActionRepository,
+    @Autowired private val sendHistoryRepository: CareActionSendHistoryRepository,
     @Autowired private val transactionManager: PlatformTransactionManager,
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val jwtTokenProvider: JwtTokenProvider,
@@ -53,6 +55,7 @@ class CareActionConcurrencyTest(
 
     @AfterEach
     fun cleanUp() {
+        sendHistoryRepository.deleteAll()
         careActionRepository.deleteAll()
         transactionRepository.deleteAll()
         customerRepository.deleteAll()
@@ -80,6 +83,9 @@ class CareActionConcurrencyTest(
         val stored = careActionRepository.findById(careAction.id!!).get()
         assertEquals(CareActionStatus.SENT, stored.status)
         assertTrue(stored.sentBy!!.startsWith("crm_"))
+        val histories = sendHistoryRepository.findAllByCareActionIdOrderByIdDesc(careAction.id!!)
+        assertEquals(1, histories.size)
+        assertEquals(stored.sentBy, histories.single().sentBy)
     }
 
     @Test

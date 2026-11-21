@@ -8,6 +8,7 @@ import com.donguri.domain.customer.entity.Customer
 import com.donguri.domain.customer.entity.CustomerGrade
 import com.donguri.domain.customer.repository.CustomerRepository
 import com.donguri.domain.employee.entity.EmployeeRole
+import com.donguri.domain.transaction.controller.FixedClockTestConfig
 import com.donguri.domain.transaction.entity.FdsStatus
 import com.donguri.domain.transaction.entity.Transaction
 import com.donguri.domain.transaction.repository.TransactionRepository
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Import
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
@@ -32,6 +34,7 @@ import kotlin.test.assertNull
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Import(FixedClockTestConfig::class)
 @Transactional
 class CareActionControllerTest(
     @Autowired private val mockMvc: MockMvc,
@@ -184,6 +187,83 @@ class CareActionControllerTest(
     }
 
     @Test
+    fun `발송하면 보낸 내용과 발송자, 시각이 이력에 남는다`() {
+        val careAction = careAction("110-111-000009")
+
+        send(careAction.id!!, marketer).andExpect { status { isOk() } }
+
+        history(careAction.id!!, admin).andExpect {
+            status { isOk() }
+            jsonPath("$.items.length()") { value(1) }
+            jsonPath("$.items[0].id") { isNumber() }
+            jsonPath("$.items[0].sentBy") { value("crm_marketer") }
+            jsonPath("$.items[0].sentAt") { value("2026-11-21T03:30:00") }
+            jsonPath("$.items[0].recommendedProduct") { value("우대금리 파킹통장") }
+            jsonPath("$.items[0].actionMessage") { value("불편을 드려 죄송합니다.") }
+            jsonPath("$.items[0].careActionVersion") { value(0) }
+        }
+    }
+
+    @Test
+    fun `재계획으로 sentBy 가 지워져도 이전 이력은 남고 재발송 이력이 최신순으로 쌓인다`() {
+        val careAction = careAction("110-111-000010")
+        send(careAction.id!!, marketer, version = 0).andExpect { status { isOk() } }
+        careAction.replan(CareRecommendation("수수료 면제", "새 안내 메시지입니다."))
+        careActionRepository.saveAndFlush(careAction)
+        assertNull(careAction.sentBy)
+        val other = jwtTokenProvider.createAccessToken("crm_other", EmployeeRole.CRM_MARKETER)
+
+        send(careAction.id!!, other, version = 2).andExpect { status { isOk() } }
+
+        em.flush()
+        em.clear()
+        history(careAction.id!!, marketer).andExpect {
+            status { isOk() }
+            jsonPath("$.items.length()") { value(2) }
+            jsonPath("$.items[0].sentBy") { value("crm_other") }
+            jsonPath("$.items[0].recommendedProduct") { value("수수료 면제") }
+            jsonPath("$.items[0].actionMessage") { value("새 안내 메시지입니다.") }
+            jsonPath("$.items[0].careActionVersion") { value(2) }
+            jsonPath("$.items[1].sentBy") { value("crm_marketer") }
+            jsonPath("$.items[1].recommendedProduct") { value("우대금리 파킹통장") }
+            jsonPath("$.items[1].actionMessage") { value("불편을 드려 죄송합니다.") }
+            jsonPath("$.items[1].careActionVersion") { value(0) }
+        }
+    }
+
+    @Test
+    fun `실패한 발송은 이력을 남기지 않는다`() {
+        val stale = careAction("110-111-000011")
+        stale.replan(CareRecommendation("수수료 면제", "새 안내 메시지입니다."))
+        careActionRepository.saveAndFlush(stale)
+        send(stale.id!!, marketer, version = 0).andExpect { status { isConflict() } }
+        history(stale.id!!, marketer).andExpect { jsonPath("$.items.length()") { value(0) } }
+
+        val sent = careAction("110-111-000012")
+        send(sent.id!!, marketer).andExpect { status { isOk() } }
+        send(sent.id!!, marketer).andExpect { status { isConflict() } }
+        history(sent.id!!, marketer).andExpect { jsonPath("$.items.length()") { value(1) } }
+    }
+
+    @Test
+    fun `발송 이력 조회 실패 케이스와 빈 이력`() {
+        val careAction = careAction("110-111-000013")
+
+        history(careAction.id!!, admin).andExpect {
+            status { isOk() }
+            jsonPath("$.items.length()") { value(0) }
+        }
+        history(999_999, marketer).andExpect {
+            status { isNotFound() }
+            jsonPath("$.code") { value("CARE_ACTION_NOT_FOUND") }
+        }
+        history(careAction.id!!, null).andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("UNAUTHORIZED") }
+        }
+    }
+
+    @Test
     fun `OpenAPI 문서는 실제 JSON 키를 쓰고 인증 주체를 파라미터로 노출하지 않는다`() {
         mockMvc.get("/v3/api-docs").andExpect {
             status { isOk() }
@@ -226,6 +306,14 @@ class CareActionControllerTest(
 
     private fun list(token: String?): ResultActionsDsl =
         mockMvc.get("/api/care-actions") {
+            token?.let { header(HttpHeaders.AUTHORIZATION, "Bearer $it") }
+        }
+
+    private fun history(
+        id: Long,
+        token: String?,
+    ): ResultActionsDsl =
+        mockMvc.get("/api/care-actions/$id/send-history") {
             token?.let { header(HttpHeaders.AUTHORIZATION, "Bearer $it") }
         }
 
