@@ -18,8 +18,6 @@ interface CareActionRepository : JpaRepository<CareAction, Long> {
     @Query("select c from CareAction c where c.id = :id")
     fun findByIdForUpdate(id: Long): CareAction?
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @QueryHints(QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
-    @Query("select c from CareAction c where c.transaction = :transaction")
-    fun findByTransactionForUpdate(transaction: Transaction): CareAction?
+    @Query("select c.id from CareAction c where c.transaction = :transaction")
+    fun findIdByTransaction(transaction: Transaction): Long?
 }
