@@ -17,6 +17,7 @@ import jakarta.persistence.Table
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
 import java.math.BigDecimal
+import java.time.LocalDateTime
 
 @Entity
 @Table(name = "transactions")
@@ -43,6 +44,8 @@ class Transaction(
     @Lob
     @Column(nullable = false)
     var shapReasons: String,
+    @Column
+    val occurredAt: LocalDateTime? = null,
 ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

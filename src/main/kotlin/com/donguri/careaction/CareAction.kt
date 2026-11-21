@@ -42,4 +42,11 @@ class CareAction(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
+
+    fun replan(recommendation: CareRecommendation) {
+        recommendedProduct = recommendation.product
+        actionMessage = recommendation.message
+        status = CareActionStatus.PENDING
+        sentBy = null
+    }
 }
