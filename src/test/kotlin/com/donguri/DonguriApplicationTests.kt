@@ -14,7 +14,6 @@ import kotlin.test.assertTrue
     properties = [
         "spring.datasource.url=jdbc:h2:mem:default_profile;MODE=MySQL;DATABASE_TO_LOWER=TRUE",
         "spring.datasource.username=sa",
-        "spring.jpa.hibernate.ddl-auto=create-drop",
         "fds.jwt.secret=dGVzdC1vbmx5LWp3dC1zZWNyZXQta2V5LWZvci1kb25ndXJpLWZkcy0zMmJ5dGVz",
     ],
 )
