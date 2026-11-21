@@ -98,6 +98,8 @@ class AcornNotFoundException : DonguriException(ErrorCode.ACORN_NOT_FOUND)
   - 그래도 Hibernate 는 허용 값 CHECK 제약(`col in ('A','B')`)을 만든다(`AttributeConverter` 를 써도 동일, Hibernate 7). `ddl-auto: update` 는 이 제약을 고치지 않는다. **Enum 상수를 추가하면 같은 PR 에서 기존 DB 의 CHECK 제약을 바꾸는 SQL 을 PR 본문에 적는다** — 마이그레이션 도구(Flyway) 도입 전까지의 규칙.
 - 엔티티를 컨트롤러 응답으로 반환하지 않는다(위 레이어 역할). `open-in-view` 는 꺼져 있으므로 지연 로딩은 서비스의 트랜잭션 안에서 끝낸다.
 - 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`) + `@AutoConfigureTestDatabase(replace = NONE)` + `@ActiveProfiles("test")` — 임의 내장 DB 가 아니라 test 프로필의 H2 MySQL 모드로 검증한다.
+- 잔액·점수처럼 동시 요청이 같은 행을 바꾸는 로직은 `findByIdForUpdate`(`PESSIMISTIC_WRITE` + `lock.timeout`)로 읽고, 동시성 테스트(커밋되는 실제 트랜잭션, 스레드 풀)로 증명한다. 락 대기 초과는 409 `LOCK_CONFLICT`.
+- 금액은 `setScale(2)`, 점수는 `setScale(4)` 로 정규화해서 저장·응답한다.
 - `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
 
 ## 보안
