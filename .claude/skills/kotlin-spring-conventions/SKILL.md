@@ -99,13 +99,16 @@ class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_
 - 생성자 프로퍼티로 필수 값을 받고, 식별자는 본문의 `@Id @GeneratedValue(strategy = IDENTITY) val id: Long? = null`.
 - `kotlin("plugin.jpa")` + allOpen(`Entity`, `MappedSuperclass`, `Embeddable`)이 설정돼 있다 — `open` 을 직접 쓰지 않는다.
 - 연관관계는 모두 `FetchType.LAZY`, 금액은 `BigDecimal` + `precision/scale` 명시.
-- Enum 은 `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.VARCHAR)`. 없으면 MySQL 네이티브 `enum(...)` 컬럼이 생겨, 상수를 추가해도 `ddl-auto: update` 가 컬럼을 바꾸지 않아 새 값 저장이 실패한다.
-  - 그래도 Hibernate 는 허용 값 CHECK 제약(`col in ('A','B')`)을 만든다(`AttributeConverter` 를 써도 동일, Hibernate 7). `ddl-auto: update` 는 이 제약을 고치지 않는다. **Enum 상수를 추가하면 같은 PR 에서 기존 DB 의 CHECK 제약을 바꾸는 SQL 을 PR 본문에 적는다** — 마이그레이션 도구(Flyway) 도입 전까지의 규칙.
+- Enum 은 `@Enumerated(EnumType.STRING)` + `@JdbcTypeCode(SqlTypes.VARCHAR)`. MySQL 네이티브 `enum(...)` 컬럼을 만들지 않는다.
+  - DB 에는 허용 값 CHECK 제약이 있다. **Enum 상수를 추가하면 같은 PR 에 CHECK 를 바꾸는 Flyway 마이그레이션을 넣는다.**
 - 엔티티를 컨트롤러 응답으로 반환하지 않는다(위 레이어 역할). `open-in-view` 는 꺼져 있으므로 지연 로딩은 서비스의 트랜잭션 안에서 끝낸다.
 - 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`) + `@AutoConfigureTestDatabase(replace = NONE)` + `@ActiveProfiles("test")` — 임의 내장 DB 가 아니라 test 프로필의 H2 MySQL 모드로 검증한다.
 - 잔액·점수처럼 동시 요청이 같은 행을 바꾸는 로직은 `findByIdForUpdate`(`PESSIMISTIC_WRITE` + `lock.timeout`)로 읽고, 동시성 테스트(커밋되는 실제 트랜잭션, 스레드 풀)로 증명한다. 락 대기 초과는 409 `LOCK_CONFLICT`.
 - 금액은 `setScale(2)`, 점수는 `setScale(4)` 로 정규화해서 저장·응답한다.
 - `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
+- 스키마는 Flyway 가 관리한다. 엔티티를 바꾸면 같은 PR 에 `src/main/resources/db/migration/V<n>__<설명>.sql` 을 추가하고, 이미 적용된 마이그레이션은 고치지 않는다. Hibernate 는 `ddl-auto: validate` 로 일치 여부만 검사한다.
+- 마이그레이션은 MySQL 8 과 H2 MySQL 모드 양쪽에서 실행되는 SQL 로 쓴다. 테스트도 같은 마이그레이션으로 기동한다.
+- SQL 로그와 Swagger 는 `local`, `test` 프로필에서만 켠다. 프로필이 없거나 `prod` 면 꺼져 있다.
 
 ## 보안
 
