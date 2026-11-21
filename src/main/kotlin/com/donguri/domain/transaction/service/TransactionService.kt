@@ -38,7 +38,7 @@ class TransactionService(
     fun simulate(request: SimulateTransactionRequest): SimulateTransactionResponse {
         val customer = customerRepository.findByIdForUpdate(request.customerId) ?: throw CustomerNotFoundException()
         val amount = request.amount.setScale(MONEY_SCALE, RoundingMode.UNNECESSARY)
-        val occurredAt = request.occurredAt ?: LocalDateTime.now(clock)
+        val occurredAt = request.occurredAt?.atZoneSameInstant(clock.zone)?.toLocalDateTime() ?: LocalDateTime.now(clock)
         val result =
             scoringEngine.score(
                 FdsScoringInput(

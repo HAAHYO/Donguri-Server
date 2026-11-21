@@ -13,7 +13,11 @@ import jakarta.persistence.EntityManager
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
@@ -26,13 +30,16 @@ import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.math.BigDecimal
-import java.time.LocalDateTime
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Import(FixedClockTestConfig::class)
 @Transactional
 class TransactionControllerTest(
     @Autowired private val mockMvc: MockMvc,
@@ -76,7 +83,7 @@ class TransactionControllerTest(
         val customer = customer(balance = "1000", churn = "0.1000")
 
         val body =
-            simulate(customer.id, "500000", device = true, occurredAt = "2026-11-21T02:30:00")
+            simulate(customer.id, "500000", device = true, occurredAt = "2026-11-21T02:30:00+09:00")
                 .andExpect { status { isCreated() } }
                 .body()
 
@@ -107,7 +114,7 @@ class TransactionControllerTest(
             status { isNotFound() }
             jsonPath("$.code") { value("CUSTOMER_NOT_FOUND") }
         }
-        listOf("0", "-100", "10.123").forEach { amount ->
+        listOf("0", "-100", "10.123", "1E+2147483647").forEach { amount ->
             simulate(customer.id, amount).andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("INVALID_INPUT") }
@@ -134,7 +141,48 @@ class TransactionControllerTest(
                 .andExpect { status { isCreated() } }
                 .body()
 
-        assertEquals(LocalDateTime.parse(body["occurredAt"].asString()).hour, body["txHour"].asInt())
+        assertEquals("2026-11-21T03:30:00", body["occurredAt"].asString())
+        assertEquals(3, body["txHour"].asInt())
+    }
+
+    @Test
+    fun `시간대가 있는 occurredAt 은 서울 시간으로 변환하고 시간대가 없으면 400 이다`() {
+        val customer = customer()
+
+        val utc = simulate(customer.id, "1000", occurredAt = "2026-11-20T16:00:00Z").andExpect { status { isCreated() } }.body()
+        val kst = simulate(customer.id, "1000", occurredAt = "2026-11-21T11:00:00+09:00").andExpect { status { isCreated() } }.body()
+
+        assertEquals(1, utc["txHour"].asInt())
+        assertEquals("2026-11-21T01:00:00", utc["occurredAt"].asString())
+        assertEquals(11, kst["txHour"].asInt())
+        simulate(customer.id, "1000", occurredAt = "2026-11-21T11:00:00").andExpect {
+            status { isBadRequest() }
+            jsonPath("$.code") { value("INVALID_INPUT") }
+        }
+    }
+
+    @Test
+    fun `OpenAPI 문서의 필드 이름은 실제 JSON 키와 같다`() {
+        mockMvc.get("/v3/api-docs").andExpect {
+            status { isOk() }
+            jsonPath("$.components.schemas.SimulateTransactionRequest.properties.isOverseas") { exists() }
+            jsonPath("$.components.schemas.SimulateTransactionRequest.properties.overseas") { doesNotExist() }
+            jsonPath("$.components.schemas.TransactionResponse.properties.isOverseas") { exists() }
+            jsonPath("$.components.schemas.TransactionResponse.properties.overseas") { doesNotExist() }
+            jsonPath("$.components.schemas.TransactionResponse.properties.isActualFraud") { exists() }
+            jsonPath("$.components.schemas.TransactionResponse.properties.actualFraud") { doesNotExist() }
+        }
+    }
+
+    @Test
+    fun `해외 거래 여부는 isOverseas 키로 받아 점수에 반영하고 같은 키로 응답한다`() {
+        val customer = customer()
+
+        simulate(customer.id, "1000", overseas = true).andExpect { status { isCreated() } }
+
+        val item = list(admin)["items"][0]
+        assertEquals(true, item["isOverseas"].asBoolean())
+        assertEquals(listOf("is_overseas"), features(item["shapReasons"]))
     }
 
     @Test
@@ -216,7 +264,7 @@ class TransactionControllerTest(
     }
 
     private fun blockedTransaction(customerId: Long?): Long =
-        simulate(customerId, "900000", overseas = true, device = true, occurredAt = "2026-11-21T03:00:00")
+        simulate(customerId, "900000", overseas = true, device = true, occurredAt = "2026-11-21T03:00:00+09:00")
             .andExpect { jsonPath("$.fdsStatus") { value("BLOCKED") } }
             .body()["transactionId"]
             .asLong()
@@ -255,7 +303,7 @@ class TransactionControllerTest(
         amount: String,
         overseas: Boolean = false,
         device: Boolean = false,
-        occurredAt: String = "2026-11-21T14:00:00",
+        occurredAt: String = "2026-11-21T14:00:00+09:00",
         token: String? = admin,
     ): ResultActionsDsl =
         post(
@@ -299,4 +347,11 @@ class TransactionControllerTest(
     private fun ResultActionsDsl.body(): JsonNode = json.readTree(andReturn().response.contentAsString)
 
     private fun token(role: EmployeeRole) = jwtTokenProvider.createAccessToken(role.name.lowercase(), role)
+}
+
+@TestConfiguration
+class FixedClockTestConfig {
+    @Bean
+    @Primary
+    fun fixedClock(): Clock = Clock.fixed(Instant.parse("2026-11-20T18:30:00Z"), ZoneId.of("Asia/Seoul"))
 }

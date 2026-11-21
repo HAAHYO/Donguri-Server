@@ -23,7 +23,8 @@ import org.springframework.test.web.servlet.post
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
-import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -69,7 +70,7 @@ class TransactionConcurrencyTest(
             SimulateTransactionRequest(
                 customerId = customer.id!!,
                 amount = BigDecimal("100000"),
-                occurredAt = LocalDateTime.of(2026, 11, 21, 14, 0),
+                occurredAt = OffsetDateTime.of(2026, 11, 21, 14, 0, 0, 0, ZoneOffset.ofHours(9)),
             )
         val requests = 10
         val start = CountDownLatch(1)
@@ -108,7 +109,7 @@ class TransactionConcurrencyTest(
                     amount = BigDecimal("900000"),
                     isOverseas = true,
                     deviceChanged = true,
-                    occurredAt = LocalDateTime.of(2026, 11, 21, 3, 0),
+                    occurredAt = OffsetDateTime.of(2026, 11, 21, 3, 0, 0, 0, ZoneOffset.ofHours(9)),
                 ),
             )
         val pool = Executors.newSingleThreadExecutor()
@@ -122,7 +123,7 @@ class TransactionConcurrencyTest(
                         SimulateTransactionRequest(
                             customerId = customer.id!!,
                             amount = BigDecimal("100000"),
-                            occurredAt = LocalDateTime.of(2026, 11, 21, 14, 0),
+                            occurredAt = OffsetDateTime.of(2026, 11, 21, 14, 0, 0, 0, ZoneOffset.ofHours(9)),
                         ),
                     )
                 }.get(10, TimeUnit.SECONDS)

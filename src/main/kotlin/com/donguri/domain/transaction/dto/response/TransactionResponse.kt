@@ -3,6 +3,7 @@ package com.donguri.domain.transaction.dto.response
 import com.donguri.domain.transaction.entity.FdsStatus
 import com.donguri.domain.transaction.entity.Transaction
 import com.donguri.global.util.MaskingUtil
+import com.fasterxml.jackson.annotation.JsonProperty
 import java.math.BigDecimal
 import java.time.LocalDateTime
 
@@ -14,10 +15,12 @@ data class TransactionResponse(
     val amount: BigDecimal,
     val txHour: Int,
     val occurredAt: LocalDateTime?,
+    @get:JsonProperty("isOverseas")
     val isOverseas: Boolean,
     val deviceChanged: Boolean,
     val fraudScore: BigDecimal,
     val fdsStatus: FdsStatus,
+    @get:JsonProperty("isActualFraud")
     val isActualFraud: Boolean?,
     val shapReasons: List<ShapReasonResponse>,
     val churnScore: BigDecimal,
