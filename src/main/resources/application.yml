@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: donguri
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/fds_bank?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&sessionVariables=innodb_lock_wait_timeout=3}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Seoul
+
+fds:
+  jwt:
+    secret: ${JWT_SECRET:}
+    access-token-validity: 30m
+  seed:
+    employee-password: ${FDS_SEED_PASSWORD:}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+    path: /swagger-ui.html
+
+---
+spring:
+  config:
+    activate:
+      on-profile: "local & !prod"
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
