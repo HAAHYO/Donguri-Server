@@ -21,7 +21,7 @@ import java.math.BigDecimal
 import java.util.UUID
 
 @Component
-@Profile("local")
+@Profile("local & !prod")
 class DataInitializer(
     private val employeeRepository: EmployeeRepository,
     private val customerRepository: CustomerRepository,
