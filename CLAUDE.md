@@ -22,6 +22,7 @@ Kotlin + Spring Boot 4 (Gradle Kotlin DSL, JDK 21) 백엔드.
 - `.github/workflows/cd.yml` — main/`v*` 태그 푸시 시 검증 후 Docker 이미지를 GHCR에 푸시
 - `.claude/` — 에이전트 하네스 (권한, hook, 에이전트, 스킬)
 - `_workspace/` — 작업별 계획/QA/리뷰 기록 (gitignore, 지우지 않는다)
+- `_workspace_archive/` — 끝난 작업의 `_workspace/` 보관본. `.claude/scripts/archive-workspace.sh` 로만 옮긴다 (gitignore, 지우지 않는다)
 
 ## 하네스: 혼자서도 리뷰받기
 팀원이 없으므로 리뷰어 역할을 분리된 에이전트가 맡는다. 한 줄 수정이나 질문이 아닌 모든 백엔드 작업은 `donguri-workflow` 스킬을 따른다.

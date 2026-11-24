@@ -35,7 +35,7 @@ description: "Donguri 백엔드의 작업 전 과정 오케스트레이터 — �
 2. 분기:
    - `_workspace/` 없음 → **새 작업**. Phase 1.
    - 있음 + 부분 요청("QA 다시", "리뷰 반영", "PR 올려줘") → 해당 Phase부터 재개. 아래 재실행 표 참고.
-   - 있음 + 무관한 새 기능 → `_workspace/` 를 `_workspace_<YYYYMMDD_HHMMSS>/` 로 옮기고 Phase 1.
+   - 있음 + 무관한 새 기능 → `bash .claude/scripts/archive-workspace.sh` 로 `_workspace/` 를 `_workspace_archive/<YYYYMMDD_HHMMSS>/` 에 보관하고 Phase 1.
 
 ## Phase 1: 계획
 
@@ -97,7 +97,7 @@ Agent(subagent_type: "pr-reviewer",
 사용자가 "릴리스해줘", "main 에 올려줘" 라고 할 때만. main 머지는 CD(GHCR 이미지 배포)를 트리거한다.
 
 1. `git switch develop && git pull --ff-only origin develop` (로컬 develop 은 읽기 전용 — 커밋하지 않는다)
-2. `_workspace/` 를 `_workspace_<timestamp>/` 로 보관하고 새로 만든다. `01_plan.md` 에는 `git log --oneline origin/main..origin/develop` 로 이번 릴리스에 포함된 PR 목록을 적는다.
+2. `bash .claude/scripts/archive-workspace.sh` 로 `_workspace/` 를 `_workspace_archive/<timestamp>/` 에 보관하고 새로 만든다. `01_plan.md` 에는 `git log --oneline origin/main..origin/develop` 로 이번 릴리스에 포함된 PR 목록을 적는다.
 3. qa-inspector — develop HEAD 기준 전체 QA(빌드 + 스모크)
 4. `gh pr create --base main --head develop` (hook 이 develop 에서만 main 을 base 로 허용)
 5. pr-reviewer — 릴리스 PR 은 이미 리뷰된 변경의 묶음이다. 기능 PR 간 상호작용, 설정/배포 영향(새 필수 환경변수 등)만 본다.
