@@ -33,7 +33,7 @@ description: "Donguri 백엔드의 작업 전 과정 오케스트레이터 — �
 
 1. `_workspace/` 존재 여부와 `git status --short`, 현재 브랜치를 확인한다.
 2. 분기:
-   - `_workspace/` 없음 → **새 작업**. Phase 1.
+   - `_workspace/` 없음 또는 비어 있음 → **새 작업**. Phase 1.
    - 있음 + 부분 요청("QA 다시", "리뷰 반영", "PR 올려줘") → 해당 Phase부터 재개. 아래 재실행 표 참고.
    - 있음 + 무관한 새 기능 → `bash .claude/scripts/archive-workspace.sh` 로 `_workspace/` 를 `_workspace_archive/<YYYYMMDD_HHMMSS>/` 에 보관하고 Phase 1.
 
