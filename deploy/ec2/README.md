@@ -96,8 +96,18 @@ GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 �
 | `Permission denied (publickey)` | `authorized_keys` 에 공개키가 없거나 `EC2_USER` 가 다름 |
 | `Connection timed out` | 보안 그룹 22 포트 |
 | `DEPLOY ERROR: /opt/donguri/.env 가 없거나 ec2-user 가 읽을 수 없습니다` | 4단계 — 파일 생성과 `chown ec2-user:` |
-| `DEPLOY FAILED ... ROLLBACK OK` | 새 이미지가 기동하지 못함. 로그의 컨테이너 출력(대개 DB 접속, Flyway, 환경변수)을 보고 고친 뒤 다시 PR. 서비스는 직전 이미지로 계속 동작 중 |
+| `DEPLOY FAILED ... ROLLBACK OK` | 새 이미지가 기동하지 못함. 로그의 컨테이너 출력(대개 DB 접속, Flyway, 환경변수)을 보고 고친 뒤 다시 PR. 서비스는 직전 이미지로 동작 중 — 단, 마이그레이션이 적용됐거나 중간에 실패했다면 아래 "롤백과 DB 마이그레이션" 을 확인 |
 | `ROLLBACK FAILED` | 직전 이미지도 뜨지 않음 → DB/설정 문제. EC2 에서 `docker logs donguri` |
+
+### 롤백과 DB 마이그레이션
+
+롤백은 **이미지만** 되돌린다. Flyway 가 이미 적용한 마이그레이션은 되돌리지 않는다.
+
+- **마이그레이션은 직전 이미지와 호환되게 쓴다.** 컬럼·테이블 추가는 안전하다 (구 버전 앱은 새 마이그레이션을 미래 버전으로 무시하고, `ddl-auto: validate` 는 엔티티에 있는 컬럼만 확인한다). 컬럼 삭제·이름 변경·타입 축소는 직전 이미지의 `validate` 를 깨므로, 코드에서 먼저 사용을 끊고 다음 릴리스에서 지운다.
+- **마이그레이션이 중간에 실패한 경우:** MySQL 의 DDL 은 트랜잭션으로 되돌려지지 않는다. 앞부분 DDL 은 남고 `flyway_schema_history` 에 `success = 0` 행이 생긴다. 이 상태에서는 어떤 이미지도 "failed migration" 검증에 걸려 뜨지 않는다 (`ROLLBACK FAILED`).
+  1. 실패한 스크립트에서 이미 적용된 DDL 을 DB 에서 직접 되돌린다.
+  2. 실패 행을 지운다 (`flyway repair` 와 같은 효과): `DELETE FROM flyway_schema_history WHERE success = 0;`
+  3. 고친 마이그레이션으로 다시 PR → 머지. 이미 성공 기록된 버전 파일은 고치지 않는다 (체크섬 불일치) — 새 버전 번호로 추가한다.
 
 ### 수동 롤백
 
