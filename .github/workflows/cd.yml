@@ -163,14 +163,18 @@ jobs:
           printf 'Host ec2\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/ec2\n  BatchMode yes\n  StrictHostKeyChecking yes\n' \
             "$EC2_HOST" "$EC2_USER" > ~/.ssh/config
 
+      # 아래 ssh 명령의 변수는 러너 값(계정, 이미지 이름)을 EC2 로 넘기려고 일부러 러너에서 전개한다
       - name: Log in to GHCR on EC2
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: printf '%s' "$GHCR_TOKEN" | ssh ec2 "docker login ghcr.io -u '$GITHUB_ACTOR' --password-stdin"
+        run: |
+          # shellcheck disable=SC2029
+          printf '%s' "$GHCR_TOKEN" | ssh ec2 "docker login ghcr.io -u '$GITHUB_ACTOR' --password-stdin"
 
       - name: Deploy
         run: |
           image="${REGISTRY}/${IMAGE_NAME,,}:sha-${GITHUB_SHA::7}"
+          # shellcheck disable=SC2029
           ssh ec2 "bash -s -- '$image'" < deploy/ec2/deploy.sh
 
       - if: always()
