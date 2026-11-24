@@ -43,4 +43,5 @@ out/
 .claude/settings.local.json
 _workspace/
 _workspace_*/
+_workspace_archive/
 __pycache__/

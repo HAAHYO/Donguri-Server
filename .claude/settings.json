@@ -34,7 +34,8 @@
       "Bash(gh api repos/HAAHYO/Donguri-Server/pulls/*/reviews*)",
       "Bash(gh api repos/HAAHYO/Donguri-Server/pulls/*/comments*)",
       "Bash(python .claude/hooks/test_guard_git.py*)",
-      "Bash(bash .claude/scripts/smoke.sh*)"
+      "Bash(bash .claude/scripts/smoke.sh*)",
+      "Bash(bash .claude/scripts/archive-workspace.sh*)"
     ],
     "ask": [
       "Bash(gh pr merge*)",
