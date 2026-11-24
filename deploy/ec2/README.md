@@ -95,7 +95,7 @@ GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 �
 | `Host key verification failed` | `EC2_KNOWN_HOSTS` 가 비었거나 인스턴스가 바뀜 → 다시 `ssh-keyscan` |
 | `Permission denied (publickey)` | `authorized_keys` 에 공개키가 없거나 `EC2_USER` 가 다름 |
 | `Connection timed out` | 보안 그룹 22 포트 |
-| `DEPLOY ERROR: /opt/donguri/.env 가 없습니다` | 4단계 |
+| `DEPLOY ERROR: /opt/donguri/.env 가 없거나 ec2-user 가 읽을 수 없습니다` | 4단계 — 파일 생성과 `chown ec2-user:` |
 | `DEPLOY FAILED ... ROLLBACK OK` | 새 이미지가 기동하지 못함. 로그의 컨테이너 출력(대개 DB 접속, Flyway, 환경변수)을 보고 고친 뒤 다시 PR. 서비스는 직전 이미지로 계속 동작 중 |
 | `ROLLBACK FAILED` | 직전 이미지도 뜨지 않음 → DB/설정 문제. EC2 에서 `docker logs donguri` |
 
