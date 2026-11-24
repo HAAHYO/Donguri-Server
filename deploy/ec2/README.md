@@ -53,8 +53,11 @@ DB_USERNAME=<사용자>
 DB_PASSWORD=<비밀번호>
 JWT_SECRET=<openssl rand -base64 32 결과>
 EOF
+sudo chown ec2-user: /opt/donguri/.env
 sudo chmod 600 /opt/donguri/.env
 ```
+
+- 소유자는 배포 사용자(`EC2_USER`)여야 한다. `docker run --env-file` 은 dockerd 가 아니라 docker 명령을 실행한 사용자가 파일을 읽는다 — root 소유 600 이면 매 배포가 `permission denied` 로 실패한다.
 
 - `DB_URL` 의 `sessionVariables=innodb_lock_wait_timeout=3` 는 빼지 않는다. 없으면 락 대기가 50초가 된다.
 - 값에 따옴표를 넣지 않는다 (`--env-file` 은 따옴표를 값의 일부로 읽는다).
