@@ -8,7 +8,8 @@
 # - 지우지 않는다. 옮기기만 한다.
 set -euo pipefail
 
-cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
+ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "$ROOT"
 ARCHIVE="_workspace_archive"
 mkdir -p "$ARCHIVE"
 
@@ -26,6 +27,10 @@ done
 
 if [ -d _workspace ] && [ -n "$(ls -A _workspace)" ]; then
   ts="$(date +%Y%m%d_%H%M%S)"
+  if [ -e "$ARCHIVE/$ts" ]; then
+    echo "보관본이 이미 존재함: $ARCHIVE/$ts — 잠시 후 다시 실행하세요" >&2
+    exit 1
+  fi
   mv _workspace "$ARCHIVE/$ts"
   echo "보관: _workspace -> $ARCHIVE/$ts"
 fi
