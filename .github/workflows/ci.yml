@@ -25,6 +25,8 @@ jobs:
         env:
           ACTIONLINT_VERSION: 1.7.7
           ACTIONLINT_SHA256: 023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
+        # 기본 셸은 pipefail 이 없다. 파이프 앞쪽 명령의 실패도 단계 실패로 잡는다
+        shell: bash
         run: |
           archive="$RUNNER_TEMP/actionlint.tar.gz"
           curl -sSfL -o "$archive" \
