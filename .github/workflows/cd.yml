@@ -141,9 +141,9 @@ jobs:
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_USER: ${{ secrets.EC2_USER }}
     steps:
-      - uses: actions/checkout@v5
-
-      - name: Configure SSH
+      # EC2 준비 전(Secrets 전부 미등록)에는 배포를 건너뛰고 성공으로 끝낸다. 일부만 있으면 설정 실수라 실패한다
+      - id: config
+        name: Check deploy config
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
@@ -152,10 +152,27 @@ jobs:
           for name in EC2_HOST EC2_USER EC2_SSH_KEY EC2_KNOWN_HOSTS; do
             [ -n "${!name}" ] || missing="$missing $name"
           done
-          if [ -n "$missing" ]; then
-            echo "::error::production environment 에 Secrets 가 없습니다:$missing (deploy/ec2/README.md 참고)"
+          if [ -z "$missing" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          elif [ "$missing" = " EC2_HOST EC2_USER EC2_SSH_KEY EC2_KNOWN_HOSTS" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            msg="배포 건너뜀: production environment 에 EC2 Secrets 가 없습니다. 이미지는 GHCR 에 푸시됐습니다. 준비 방법은 deploy/ec2/README.md"
+            echo "::notice::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::production environment 에 Secrets 가 일부만 있습니다. 빠진 것:$missing (deploy/ec2/README.md 참고)"
             exit 1
           fi
+
+      - if: steps.config.outputs.ready == 'true'
+        uses: actions/checkout@v5
+
+      - if: steps.config.outputs.ready == 'true'
+        name: Configure SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/ec2
           chmod 600 ~/.ssh/ec2
@@ -164,19 +181,21 @@ jobs:
             "$EC2_HOST" "$EC2_USER" > ~/.ssh/config
 
       # 아래 ssh 명령의 변수는 러너 값(계정, 이미지 이름)을 EC2 로 넘기려고 일부러 러너에서 전개한다
-      - name: Log in to GHCR on EC2
+      - if: steps.config.outputs.ready == 'true'
+        name: Log in to GHCR on EC2
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # shellcheck disable=SC2029
           printf '%s' "$GHCR_TOKEN" | ssh ec2 "docker login ghcr.io -u '$GITHUB_ACTOR' --password-stdin"
 
-      - name: Deploy
+      - if: steps.config.outputs.ready == 'true'
+        name: Deploy
         run: |
           image="${REGISTRY}/${IMAGE_NAME,,}:sha-${GITHUB_SHA::7}"
           # shellcheck disable=SC2029
           ssh ec2 "bash -s -- '$image'" < deploy/ec2/deploy.sh
 
-      - if: always()
+      - if: always() && steps.config.outputs.ready == 'true'
         name: Log out of GHCR on EC2
         run: ssh ec2 "docker logout ghcr.io" || true
