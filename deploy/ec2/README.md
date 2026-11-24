@@ -30,6 +30,12 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker ec2-user   # 다시 로그인해야 적용
 ```
 
+로그 드라이버가 기본값(`json-file`)인지 확인한다. `deploy.sh` 의 로그 크기 제한(`--log-opt max-size`)은 `json-file`/`local` 에서만 유효하고, 다른 드라이버면 컨테이너 실행 자체가 실패한다.
+
+```bash
+docker info --format '{{.LoggingDriver}}'   # json-file
+```
+
 ## 3. 배포용 SSH 키
 
 로컬에서 배포 전용 키를 만든다 (비밀번호 없이 — Actions 가 사용).
