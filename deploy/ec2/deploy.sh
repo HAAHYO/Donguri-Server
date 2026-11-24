@@ -44,8 +44,7 @@ healthy() {
 }
 
 echo "배포: ${PREV:-<없음>} -> ${IMAGE}"
-start "$IMAGE"
-if healthy; then
+if start "$IMAGE" && healthy; then
   echo "DEPLOY OK: ${IMAGE}"
   docker images "${IMAGE%:*}" --format '{{.Repository}}:{{.Tag}}' \
     | grep -vxF -e "$IMAGE" -e "${PREV:-$IMAGE}" \
@@ -53,16 +52,17 @@ if healthy; then
   exit 0
 fi
 
-echo "DEPLOY FAILED: ${IMAGE} 헬스체크 실패 — 컨테이너 로그 마지막 80줄:" >&2
+echo "DEPLOY FAILED: ${IMAGE} 기동 또는 헬스체크 실패 — 컨테이너 로그 마지막 80줄:" >&2
 docker logs --tail 80 "$NAME" >&2 || true
 if [ -n "$PREV" ] && [ "$PREV" != "$IMAGE" ]; then
   echo "롤백: ${PREV}" >&2
-  start "$PREV"
-  if healthy; then
+  if start "$PREV" && healthy; then
     echo "ROLLBACK OK: ${PREV}" >&2
   else
     echo "ROLLBACK FAILED: ${PREV} 도 헬스체크에 실패했습니다. EC2 에서 직접 확인하세요." >&2
   fi
+elif [ "$PREV" = "$IMAGE" ]; then
+  echo "같은 이미지를 다시 배포한 것이라 되돌릴 이미지가 없습니다." >&2
 else
   echo "직전 이미지가 없어 롤백하지 않습니다." >&2
 fi
