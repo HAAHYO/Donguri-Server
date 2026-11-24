@@ -19,6 +19,21 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # 워크플로(actionlint, run: 스크립트는 shellcheck 연동)와 셸 스크립트(shellcheck) 정적 검사.
+      # actionlint 는 고정 버전을 받아 체크섬을 검증한다. shellcheck 는 러너 기본 설치본을 쓴다
+      - name: Lint workflows and shell scripts
+        env:
+          ACTIONLINT_VERSION: 1.7.7
+          ACTIONLINT_SHA256: 023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl -sSfL -o "$archive"             "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          shellcheck --version | sed -n 2p
+          "$RUNNER_TEMP/actionlint" -color
+          git ls-files -z '*.sh' | xargs -0 shellcheck
+
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
