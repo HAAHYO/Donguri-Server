@@ -99,4 +99,14 @@ GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 �
 | `DEPLOY FAILED ... ROLLBACK OK` | 새 이미지가 기동하지 못함. 로그의 컨테이너 출력(대개 DB 접속, Flyway, 환경변수)을 보고 고친 뒤 다시 PR. 서비스는 직전 이미지로 계속 동작 중 |
 | `ROLLBACK FAILED` | 직전 이미지도 뜨지 않음 → DB/설정 문제. EC2 에서 `docker logs donguri` |
 
-수동 롤백: EC2 에서 `bash deploy.sh ghcr.io/haahyo/donguri-server:sha-<이전 커밋>` (스크립트는 EC2 에 복사해 둔다). 또는 Actions 에서 이전 커밋의 CD 실행을 **Re-run all jobs** 하면 그 커밋의 이미지로 다시 배포된다. 이미지는 현재·직전 것만 EC2 에 남기고 나머지는 배포 성공 시 지운다. GHCR 에는 모든 `sha-*` 태그가 남는다.
+### 수동 롤백
+
+- **직전 이미지로:** EC2 에는 현재·직전 이미지가 남아 있어(나머지는 배포 성공 시 정리) GHCR 로그인 없이 바로 된다.
+  ```bash
+  docker inspect --format '{{.Config.Image}}' donguri   # 현재 이미지
+  docker images ghcr.io/haahyo/donguri-server           # 남아 있는 이미지
+  bash deploy.sh ghcr.io/haahyo/donguri-server:sha-<직전 커밋>
+  ```
+  `deploy.sh` 는 저장소의 [`deploy/ec2/deploy.sh`](deploy.sh) 를 EC2 에 복사해 두고 쓴다.
+- **더 오래된 이미지로:** GHCR 에는 모든 `sha-*` 태그가 남는다. Actions 에서 그 커밋의 CD 실행을 열고 **deploy job 하나만** Re-run 한다 (그 커밋의 `sha-*` 이미지를 배포한다).
+  **Re-run all jobs 는 쓰지 않는다** — image job 이 다시 돌면서 GHCR 의 `main` 태그를 옛 이미지로 덮어쓴다.
