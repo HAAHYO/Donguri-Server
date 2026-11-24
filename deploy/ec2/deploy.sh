@@ -6,6 +6,7 @@
 #
 # - 운영 비밀값은 EC2 의 env 파일에서만 읽는다. GitHub 를 거치지 않는다.
 # - 교체 중 짧은 다운타임이 있다 (단일 인스턴스, 같은 포트).
+# - sha 태그는 바뀌지 않으므로 EC2 에 이미 있는 이미지는 다시 받지 않는다 (GHCR 로그아웃 상태의 수동 롤백용).
 set -euo pipefail
 
 IMAGE="${1:-}"
@@ -24,7 +25,7 @@ if [ ! -r "$ENV_FILE" ]; then
   exit 1
 fi
 
-docker pull "$IMAGE"
+docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull "$IMAGE"
 PREV="$(docker inspect --format '{{.Config.Image}}' "$NAME" 2>/dev/null || true)"
 
 start() {
