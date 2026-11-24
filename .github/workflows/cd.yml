@@ -41,7 +41,10 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     steps:
+      # 이 job 은 PR 코드도 빌드하므로 packages: write 토큰을 .git/config 에 남기지 않는다
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-java@v5
         with:
