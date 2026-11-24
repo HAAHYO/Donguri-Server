@@ -19,8 +19,8 @@ if [ -z "$IMAGE" ]; then
   echo "사용: bash deploy.sh <이미지>" >&2
   exit 1
 fi
-if [ ! -f "$ENV_FILE" ]; then
-  echo "DEPLOY ERROR: ${ENV_FILE} 가 없습니다. deploy/ec2/README.md 의 .env 준비 단계를 먼저 하세요." >&2
+if [ ! -r "$ENV_FILE" ]; then
+  echo "DEPLOY ERROR: ${ENV_FILE} 가 없거나 $(id -un) 가 읽을 수 없습니다. deploy/ec2/README.md 의 .env 준비 단계를 확인하세요." >&2
   exit 1
 fi
 
