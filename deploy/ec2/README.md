@@ -104,7 +104,10 @@ GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 �
 롤백은 **이미지만** 되돌린다. Flyway 가 이미 적용한 마이그레이션은 되돌리지 않는다.
 
 - **마이그레이션은 직전 이미지와 호환되게 쓴다.** 컬럼·테이블 추가는 안전하다 (구 버전 앱은 새 마이그레이션을 미래 버전으로 무시하고, `ddl-auto: validate` 는 엔티티에 있는 컬럼만 확인한다). 컬럼 삭제·이름 변경·타입 축소는 직전 이미지의 `validate` 를 깨므로, 코드에서 먼저 사용을 끊고 다음 릴리스에서 지운다.
-- **마이그레이션이 중간에 실패한 경우:** MySQL 의 DDL 은 트랜잭션으로 되돌려지지 않는다. 앞부분 DDL 은 남고 `flyway_schema_history` 에 `success = 0` 행이 생긴다. 이 상태에서는 어떤 이미지도 "failed migration" 검증에 걸려 뜨지 않는다 (`ROLLBACK FAILED`).
+- **마이그레이션이 중간에 실패한 경우:** MySQL 의 DDL 은 트랜잭션으로 되돌려지지 않는다. 앞부분 DDL 은 남고 `flyway_schema_history` 에 `success = 0` 행이 생긴다.
+  - 직전 이미지는 그 버전을 모르므로 실패 행을 "미래의 실패"로 보고 경고만 남긴 채 뜬다. 그래서 대개 **`ROLLBACK OK` 가 나오지만 스키마는 반쯤 바뀐 상태**다. `ROLLBACK OK` 만 보고 넘어가지 않는다.
+  - 고친 이미지를 다시 배포해도 같은 버전의 실패 행 때문에 검증에서 막힌다 (`ROLLBACK OK` 가 반복된다).
+  - 확인: deploy job 로그의 컨테이너 출력에서 `Migration of schema` / `failed` 를 찾거나, DB 에서 `SELECT version, description FROM flyway_schema_history WHERE success = 0;`
   1. 실패한 스크립트에서 이미 적용된 DDL 을 DB 에서 직접 되돌린다.
   2. 실패 행을 지운다 (`flyway repair` 와 같은 효과): `DELETE FROM flyway_schema_history WHERE success = 0;`
   3. 고친 마이그레이션으로 다시 PR → 머지. 이미 성공 기록된 버전 파일은 고치지 않는다 (체크섬 불일치) — 새 버전 번호로 추가한다.
