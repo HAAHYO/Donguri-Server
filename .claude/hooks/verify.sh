@@ -3,7 +3,7 @@
 # 실패하면 exit 2 로 종료를 막고, 실패 로그를 Claude에게 돌려줘 스스로 고치게 한다.
 set -uo pipefail
 
-cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}" || exit 1
 
 input="$(cat)"
 attempts_file="build/.claude-verify-attempts"
@@ -50,8 +50,7 @@ else
 fi
 mkdir -p build && echo "$attempts" > "$attempts_file"
 
-log="$(./gradlew ktlintFormat check --console=plain -q 2>&1)"
-if [ $? -eq 0 ]; then
+if log="$(./gradlew ktlintFormat check --console=plain -q 2>&1)"; then
   rm -f "$attempts_file"
   exit 0
 fi
