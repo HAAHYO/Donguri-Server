@@ -11,7 +11,7 @@
 # - Bash 도구 타임아웃은 300000ms 이상으로 호출할 것 (부팅 대기 최대 150초).
 set -uo pipefail
 
-cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
+cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}" || exit 1
 PORT="${SMOKE_PORT:-18080}"
 BASE="http://localhost:${PORT}"
 LOG="_workspace/smoke.log"
