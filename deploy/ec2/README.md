@@ -8,7 +8,7 @@ main 머지     → CD image job(check → 빌드 → 스모크 → GHCR 푸시)
 Actions 수동 실행(main) → 위와 같음 (재배포)
 ```
 
-아래 준비는 **처음 한 번**만 한다. 준비 전에 `main` 에 머지하면 deploy job 은 "Secrets 가 없습니다" 로 실패하고, 이미지 푸시는 정상 완료된다.
+아래 준비는 **처음 한 번**만 한다. 준비 전(5단계의 Secrets 가 하나도 없음)에 `main` 에 머지하면 이미지는 GHCR 에 푸시되고 deploy job 은 "배포 건너뜀" 안내를 남긴 채 성공으로 끝난다. 5단계에서 Secrets 4개를 모두 등록하면 다음 `main` 머지부터 자동으로 배포된다.
 
 ## 1. EC2 인스턴스
 
@@ -97,7 +97,8 @@ GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 �
 
 | 증상 (deploy job 로그) | 원인과 조치 |
 |------------------------|-------------|
-| `Secrets 가 없습니다: ...` | 5단계에서 빠진 이름을 등록 |
+| `배포 건너뜀: ... Secrets 가 없습니다` (job 은 성공) | 아직 준비 전. 배포하려면 5단계 |
+| `Secrets 가 일부만 있습니다. 빠진 것: ...` | 5단계에서 빠진 이름을 등록 (일부만 있으면 설정 실수로 보고 실패) |
 | `Host key verification failed` | `EC2_KNOWN_HOSTS` 가 비었거나 인스턴스가 바뀜 → 다시 `ssh-keyscan` |
 | `Permission denied (publickey)` | `authorized_keys` 에 공개키가 없거나 `EC2_USER` 가 다름 |
 | `Connection timed out` | 보안 그룹 22 포트 |
