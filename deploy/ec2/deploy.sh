@@ -31,6 +31,7 @@ PREV="$(docker inspect --format '{{.Config.Image}}' "$NAME" 2>/dev/null || true)
 start() {
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   docker run -d --name "$NAME" --restart unless-stopped \
+    --log-opt max-size=10m --log-opt max-file=5 \
     --env-file "$ENV_FILE" -p "${HOST_PORT}:8080" "$1" >/dev/null
 }
 
