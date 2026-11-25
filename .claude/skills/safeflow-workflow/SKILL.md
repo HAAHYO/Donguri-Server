@@ -24,7 +24,7 @@ description: "SafeFlow 백엔드의 작업 전 과정 오케스트레이터 — 
 - `gh api` 는 리뷰 스레드 답글/해결 외의 GraphQL mutation, ref 쓰기 금지
 - `git add -A` / `.` / `--no-verify` 불가
 - 커밋 제목 형식 검사
-- `gh pr merge` ← `_workspace/review-report.md` 가 PR head·해당 PR 기준 `required_open=0` 이어야 함
+- `gh pr merge` ← PR head 의 CI·CD 체크가 모두 끝나 통과했고, `_workspace/review-report.md` 가 PR head·해당 PR 기준 `required_open=0` 이어야 함. `--admin` 금지
 - `gh api` 로 머지(`/pulls/N/merge`, `mergePullRequest` 등) 금지 — 게이트 우회 경로
 - Stop hook: `./gradlew check` 실패 시 종료 불가
 
@@ -82,7 +82,7 @@ Agent(subagent_type: "pr-reviewer",
 
 ## Phase 7: 머지
 
-`required_open=0` 이고 CI(`gh pr checks`)가 통과하면 사용자에게 머지 여부를 묻는다 (`gh pr merge` 는 권한상 ask). 기능 PR 은 `develop` 으로 머지된다 — 배포는 일어나지 않는다.
+`required_open=0` 이고 CI·CD(`gh pr checks`)가 모두 통과하면 (hook 이 둘 다 확인한다) 사용자에게 머지 여부를 묻는다 (`gh pr merge` 는 권한상 ask). 기능 PR 은 `develop` 으로 머지된다 — 배포는 일어나지 않는다.
 
 ## Phase 7b: 릴리스 (develop → main)
 

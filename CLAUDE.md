@@ -39,7 +39,7 @@ Kotlin 파일을 쓰거나 리뷰하기 전에는 항상 `kotlin-spring-conventi
 |------|------|
 | `agents/pr-reviewer` | 없는 팀원 대신 PR 리뷰 → GitHub 코멘트 + `_workspace/review-report.md` |
 | `skills/` | `safeflow-workflow`, `pr-review`, `review-response`, `git-commit-convention`, `kotlin-spring-conventions` |
-| `hooks/guard_git.py` (PreToolUse, `guard-git.sh` 로 실행) | main/develop 커밋·푸시, 일괄 스테이징, hook 우회, 잘못된 커밋 제목, 브랜치 전략에 맞지 않는 PR base(생성·수정·머지 모두), `gh api` 머지·ref 쓰기·저장소 설정 변경 차단. 셀프 리뷰 필수 0건 없이 `gh pr merge` 차단 |
+| `hooks/guard_git.py` (PreToolUse, `guard-git.sh` 로 실행) | main/develop 커밋·푸시, 일괄 스테이징, hook 우회, 잘못된 커밋 제목, 브랜치 전략에 맞지 않는 PR base(생성·수정·머지 모두), `gh api` 머지·ref 쓰기·저장소 설정 변경 차단. PR head 의 CI·CD 체크 전부 통과·셀프 리뷰 필수 0건 없이 `gh pr merge` 차단, `--admin` 머지 차단 |
 | `scripts/smoke.sh` | 스모크: toolchain JDK로 앱 기동 → 요청 → 종료 (엔드포인트 동작이 바뀌었을 때 직접 실행) |
 | `scripts/archive-workspace.sh` | 끝난 `_workspace/` 를 `_workspace_archive/<timestamp>/` 로 보관하고 빈 `_workspace/` 생성 |
 | `hooks/verify.sh` (Stop) | `./gradlew check` 실패 시 종료 차단 |
