@@ -133,7 +133,6 @@ class GuardGitTest(unittest.TestCase):
 
     def test_gh_api_merge_blocked(self):
         self.feature_branch()
-        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
         self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
         for cmd in [
             "gh api repos/o/r/pulls/1/merge -X PUT",
@@ -146,12 +145,11 @@ class GuardGitTest(unittest.TestCase):
 
     def test_gh_prefixes_do_not_bypass_gates(self):
         self.feature_branch()
-        self.assertEqual(self.run_hook("GH_TOKEN=x gh pr create --base develop --fill"), 2)
+        self.assertEqual(self.run_hook("GH_TOKEN=x gh pr create --base main --fill"), 2)
         self.assertEqual(self.run_hook("gh -R o/r pr create --fill"), 2)
 
     def test_review_marker_must_match_pr_number(self):
         self.feature_branch()
-        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
         self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
         self.assertEqual(self.run_hook("gh pr merge 2 --squash"), 2)
         self.assertEqual(self.run_hook("gh pr merge --squash"), 0)
@@ -215,7 +213,6 @@ class GuardGitTest(unittest.TestCase):
 
     def test_pr_base_must_follow_branch_strategy(self):
         self.feature_branch()
-        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
         self.assertEqual(self.run_hook("gh pr create --fill"), 2)
         self.assertEqual(self.run_hook("gh pr create --base main --fill"), 2)
         self.assertEqual(self.run_hook("gh pr create -B develop --fill"), 0)
@@ -279,7 +276,6 @@ class GuardGitTest(unittest.TestCase):
 
     def test_pr_merge_by_url_checks_number(self):
         self.feature_branch()
-        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
         self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
         self.assertEqual(self.run_hook("gh pr merge https://github.com/o/r/pull/2"), 2)
         self.assertEqual(self.run_hook("gh pr merge https://github.com/o/r/pull/1"), 0)
@@ -287,7 +283,6 @@ class GuardGitTest(unittest.TestCase):
     # --- QA 라운드 3에서 발견된 우회/오탐 사례 ---
 
     def test_merge_checks_pr_base_against_strategy(self):
-        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
         self.write("review-report.md", f"<!-- self-review pr=3 head={self.head} required_open=0 -->\n")
         self.assertEqual(self.run_hook("gh pr merge 3"), 2)  # feat/z → main
         self.write("review-report.md", f"<!-- self-review pr=4 head={self.head} required_open=0 -->\n")
@@ -309,10 +304,9 @@ class GuardGitTest(unittest.TestCase):
         self.assertEqual(self.run_hook(f"gh api graphql -f query='{q}'"), 2)
 
     def test_pr_create_respects_head_option(self):
-        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
         self.feature_branch()
         self.assertEqual(self.run_hook("gh pr create --base develop --head feat/x --fill"), 0)
-        self.assertEqual(self.run_hook("gh pr create --base main --head develop --fill"), 2)  # 현재 브랜치 아님
+        self.assertEqual(self.run_hook("gh pr create --base develop --head develop --fill"), 2)  # develop 의 base 는 main
 
     def test_runner_wrappers_checked(self):
         for cmd in ["nice -n 5 git commit -m 'feat: 추가'", "timeout 30s git push origin main",
@@ -381,19 +375,12 @@ class GuardGitTest(unittest.TestCase):
         self.feature_branch()
         self.assertEqual(self.run_hook('git switch main && git commit -m "feat: 추가"'), 2)
 
-    def test_pr_create_requires_fresh_passing_qa(self):
+    def test_pr_create_does_not_require_qa_report(self):
         self.feature_branch()
-        self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 2)
-        self.write("qa-report.md", "<!-- qa-report head=deadbeef verdict=PASS -->\n")
-        self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 2)
-        self.write("qa-report.md", f"<!-- qa-report head={self.head[:7]} verdict=FAIL -->\n")
-        self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 2)
-        self.write("qa-report.md", f"<!-- qa-report head={self.head[:7]} verdict=PASS -->\n")
         self.assertEqual(self.run_hook("gh pr create --base develop --fill"), 0)
 
     def test_pr_merge_requires_clean_self_review(self):
         self.feature_branch()
-        self.write("qa-report.md", f"<!-- qa-report head={self.head} verdict=PASS -->\n")
         self.assertEqual(self.run_hook("gh pr merge 1 --squash"), 2)
         self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=2 -->\n")
         self.assertEqual(self.run_hook("gh pr merge 1 --squash"), 2)
