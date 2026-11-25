@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: "Donguri PR을 '팀원 리뷰어'처럼 리뷰하고 GitHub에 한국어 라인 코멘트와 요약 리뷰를 남기는 방법 — 무엇이 코멘트할 가치가 있는지, 이 코드베이스에서 볼 것, gh 로 게시하는 법, _workspace/review-report.md 형식. pr-reviewer 에이전트의 주 스킬이며 'PR 리뷰해줘', '셀프 리뷰', '코멘트 남겨줘' 요청에 사용한다."
+description: "SafeFlow PR을 '팀원 리뷰어'처럼 리뷰하고 GitHub에 한국어 라인 코멘트와 요약 리뷰를 남기는 방법 — 무엇이 코멘트할 가치가 있는지, 이 코드베이스에서 볼 것, gh 로 게시하는 법, _workspace/review-report.md 형식. pr-reviewer 에이전트의 주 스킬이며 'PR 리뷰해줘', '셀프 리뷰', '코멘트 남겨줘' 요청에 사용한다."
 ---
 
 # PR 셀프 리뷰
@@ -66,7 +66,7 @@ diff를 읽은 뒤 반드시 주변 파일을 연다. 그 다음:
   "event": "COMMENT",
   "body": "<요약 리뷰 마크다운>",
   "comments": [
-    {"path": "src/main/kotlin/com/donguri/...", "line": 42, "side": "RIGHT", "body": "(필수) ..."}
+    {"path": "src/main/kotlin/com/safeflow/...", "line": 42, "side": "RIGHT", "body": "(필수) ..."}
   ]
 }
 ```

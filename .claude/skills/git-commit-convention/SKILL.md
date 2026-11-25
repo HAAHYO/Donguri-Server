@@ -1,6 +1,6 @@
 ---
 name: git-commit-convention
-description: "Donguri의 커밋 규칙 — 영어 type 접두사 + 짧은 한국어 요약, 한 커밋에 한 관심사, 의존성 순서. 이 저장소에서 커밋할 때마다, '커밋해줘', 섞인 변경을 나눌 때, PR 전에 사용한다. 형식과 main/develop 보호는 guard_git.py hook이 강제한다."
+description: "SafeFlow의 커밋 규칙 — 영어 type 접두사 + 짧은 한국어 요약, 한 커밋에 한 관심사, 의존성 순서. 이 저장소에서 커밋할 때마다, '커밋해줘', 섞인 변경을 나눌 때, PR 전에 사용한다. 형식과 main/develop 보호는 guard_git.py hook이 강제한다."
 ---
 
 # 커밋 컨벤션

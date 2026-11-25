@@ -1,4 +1,4 @@
-# Donguri
+# SafeFlow
 
 Kotlin + Spring Boot 4 (Gradle Kotlin DSL, JDK 21) 백엔드.
 
@@ -16,8 +16,8 @@ Kotlin + Spring Boot 4 (Gradle Kotlin DSL, JDK 21) 백엔드.
 - 비밀값은 커밋하지 않는다. 환경변수 또는 GitHub Secrets를 사용한다.
 
 ## 구조
-- `src/main/kotlin/com/donguri` — 애플리케이션 코드
-- `src/test/kotlin/com/donguri` — 테스트
+- `src/main/kotlin/com/safeflow` — 애플리케이션 코드
+- `src/test/kotlin/com/safeflow` — 테스트
 - `.github/workflows/ci.yml` — PR, main/develop 푸시 시 actionlint(워크플로)·shellcheck(`*.sh`) → hook 테스트 → `./gradlew check`. 린트는 CI 에서만 돈다(로컬 Stop hook 은 `./gradlew check` 만)
 - `.github/workflows/cd.yml` — PR 시 이미지 빌드+기동 스모크(푸시 없음). main/`v*` 태그 푸시 시 검증 후 GHCR 푸시
 - `Dockerfile`, `railway.json`, `deploy/railway/` — 배포. Railway 가 GitHub Actions 성공 후 `main` 을 같은 Dockerfile 로 빌드·배포(헬스체크 실패 시 직전 배포 유지). 사전 준비는 `deploy/railway/README.md`
