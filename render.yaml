@@ -1,0 +1,30 @@
+# Render Blueprint. 사전 준비와 확인 절차는 deploy/render/README.md
+services:
+  - type: web
+    name: safeflow-server
+    runtime: docker
+    # 무료 플랜. 생략하면 유료 인스턴스로 만들어진다
+    plan: free
+    # 생성 후 바꿀 수 없다. 한국과 가장 가까운 리전
+    region: singapore
+    branch: main
+    # main 의 GitHub Actions(CI check, CD image)가 모두 통과한 커밋만 배포한다
+    autoDeployTrigger: checksPass
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      # TiDB Cloud 는 30분 넘게 열린 커넥션을 끊을 수 있고(권장 최대 수명 5분), 유휴 커넥션은 340초 뒤 끊는다
+      - key: SPRING_DATASOURCE_HIKARI_MAXLIFETIME
+        value: "300000"
+      - key: SPRING_DATASOURCE_HIKARI_KEEPALIVETIME
+        value: "120000"
+      # 비밀값: Blueprint 를 처음 만들 때 대시보드에서 입력한다
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
