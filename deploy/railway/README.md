@@ -44,7 +44,7 @@ JWT_SECRET=<openssl rand -base64 32 결과>
 
 ## 4. 첫 배포와 확인
 
-1. 변수를 저장하면 Railway 가 `main` 의 최신 커밋을 배포한다. 이후에는 `main` 머지마다 자동 배포된다.
+1. 저장소를 연결하는 순간 Railway 가 변수 없이 첫 배포를 시작한다 — 이 배포는 DB 접속·`JWT_SECRET` 이 없어 실패하는 게 정상이다. 변수를 저장하면 다시 배포한다. 이후에는 `main` 머지마다 자동 배포된다.
 2. 서비스 **Deployments** 에서 상태가 **Active** 인지 확인한다.
 3. `curl https://<도메인>/actuator/health` → `{"status":"UP"}`
 
@@ -53,7 +53,7 @@ JWT_SECRET=<openssl rand -base64 32 결과>
 | 증상 | 원인과 조치 |
 |------|-------------|
 | 배포가 `Waiting for CI` 에서 멈춤 | 그 커밋의 GitHub Actions 가 실패했거나 아직 실행 중. Actions 결과를 본다 |
-| `Healthcheck failed` | 새 배포가 기동하지 못함 — **직전 배포가 계속 서비스한다.** Deploy Logs 에서 원인(대개 DB 접속, Flyway, 변수)을 보고 고친 뒤 다시 PR. 마이그레이션이 적용됐거나 중간에 실패했다면 아래 "롤백과 DB 마이그레이션" 을 확인 |
+| `Healthcheck failed` | 새 배포가 기동하지 못함 — **직전 배포가 계속 서비스한다** (성공한 배포가 아직 없으면 서비스 중인 것도 없다). Deploy Logs 에서 원인(대개 DB 접속, Flyway, 변수)을 보고 고친 뒤 다시 PR. 마이그레이션이 적용됐거나 중간에 실패했다면 아래 "롤백과 DB 마이그레이션" 을 확인 |
 | `Communications link failure` | `DB_URL` 의 변수 참조 이름이 MySQL 서비스 이름과 다름 (`${{MySQL.…}}`) |
 | `JWT_SECRET` 관련 기동 실패 | 2단계 변수 누락 |
 
