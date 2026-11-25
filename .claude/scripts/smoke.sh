@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 자가 QA 스모크: 앱을 띄워 실제 HTTP 호출 결과를 출력하고 반드시 종료한다.
+# 스모크: 앱을 띄워 실제 HTTP 호출 결과를 출력하고 반드시 종료한다.
 #
 # 사용: bash .claude/scripts/smoke.sh [요청 파일]
 #   요청 파일은 줄마다 `METHOD PATH [JSON 본문]` (빈 줄, #주석 무시). 예:

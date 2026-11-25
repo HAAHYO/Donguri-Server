@@ -52,4 +52,4 @@ gh api repos/HAAHYO/SafeFlow-Server/pulls/<번호>/comments/<databaseId>/replies
 
 ## 4. 다음 단계
 
-반영 커밋이 하나라도 있으면: push → qa-inspector 재검증 → pr-reviewer 재리뷰 (`safeflow-workflow` Phase 7). 코드가 바뀐 뒤의 QA/리뷰 리포트는 이전 HEAD 기준이라 hook이 머지를 막는다.
+반영 커밋이 하나라도 있으면: push → pr-reviewer 재리뷰 (`safeflow-workflow` Phase 6). 코드가 바뀐 뒤의 리뷰 리포트는 이전 HEAD 기준이라 hook이 머지를 막는다.
