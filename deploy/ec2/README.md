@@ -85,6 +85,8 @@ sudo chmod 600 /opt/donguri/.env
 
 `EC2_KNOWN_HOSTS` 는 EC2 의 호스트 키를 고정해 중간자 공격을 막는다. 인스턴스를 새로 만들면 다시 등록한다.
 
+Secrets 를 등록하기 **전에** 같은 화면의 **Deployment branches and tags** 를 **Selected branches and tags** 로 바꾸고 `main` 만 추가한다. 기본값(제한 없음)이면 `main` 이 아닌 브랜치의 워크플로도 `production` 을 지정해 `EC2_SSH_KEY` 를 읽을 수 있다. 제한 후에는 다른 브랜치에서 `production` 을 쓰는 job 이 시작 전에 거부된다.
+
 GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 별도 Secret 이 필요 없다.
 
 배포 전 승인을 걸고 싶으면 같은 화면의 **Required reviewers** 를 켠다. 위 Secrets 4개를 등록할 때 함께 켠다 — Secrets 없이 먼저 켜면 배포를 건너뛸 실행마다 승인 대기가 걸린다.
