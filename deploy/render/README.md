@@ -36,8 +36,12 @@ main 머지 → GitHub Actions(CI check, CD image) 모두 성공 → Render 가 
 
 ## 2. Render 서비스
 
+> **`render.yaml` 이 `main` 에 들어간 뒤(develop → main 릴리스 머지 후)에 만든다.**
+> 저장소 기본 브랜치는 `develop` 이다. Blueprint 를 `develop` 으로 만들면 develop 에 머지한 `render.yaml` 변경이 릴리스 없이 운영 서비스 설정에 반영된다.
+
 1. https://render.com 에 GitHub 계정으로 가입한다.
-2. **New** → **Blueprint** → 저장소 `HAAHYO/SafeFlow-Server` 를 고른다. `render.yaml` 을 읽어 `safeflow-server` 웹 서비스(Free)를 보여 준다.
+2. **New** → **Blueprint** → 저장소 `HAAHYO/SafeFlow-Server` 를 고르고, **Branch** 를 `main` 으로 바꾼다. `render.yaml` 을 읽어 `safeflow-server` 웹 서비스(Free)를 보여 준다.
+   - 브랜치가 `main` 인지 확인한다. `develop` 으로 만들었다면 Blueprint 를 지우고 `main` 으로 다시 만든다 (서비스의 배포 브랜치는 `render.yaml` 의 `branch: main` 이 정한다).
    - 플랜이 **Free** 로 표시되는지 확인한다. 다른 플랜이 보이면 만들지 않는다.
 3. `sync: false` 로 둔 변수 값을 입력한다:
 
