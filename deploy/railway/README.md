@@ -18,7 +18,7 @@ main 머지 → GitHub Actions(CI check, CD image) 성공 → Railway 가 같은
 
 ## 2. 백엔드 서비스
 
-1. **+ Create** → **GitHub Repo** → `HAAHYO/Donguri-Server`.
+1. **+ Create** → **GitHub Repo** → `HAAHYO/SafeFlow-Server`.
 2. 서비스 **Settings**:
    - **Source → Branch:** `main`
    - **Wait for CI:** 켠다. GitHub Actions 가 성공한 커밋만 배포한다 — 테스트나 이미지 스모크가 실패한 커밋은 배포되지 않는다.
