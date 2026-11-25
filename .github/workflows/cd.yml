@@ -124,6 +124,10 @@ jobs:
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
         run: |
+          if [ -z "$TAGS" ]; then
+            echo "::error::푸시할 이미지 태그가 없습니다. 버전 태그는 vX.Y.Z 형식이어야 합니다"
+            exit 1
+          fi
           while read -r tag; do
             [ -n "$tag" ] && docker push "$tag"
           done <<< "$TAGS"
