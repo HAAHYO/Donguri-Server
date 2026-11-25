@@ -14,4 +14,5 @@ RUN addgroup -S app && adduser -S app -G app
 COPY --from=build /src/build/libs/app.jar app.jar
 USER app
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# Render free 인스턴스(512 MB, 0.1 CPU)에 맞춘다: 힙을 컨테이너 메모리의 60% 로, GC 스레드를 하나로
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=60", "-XX:+UseSerialGC", "-jar", "/app/app.jar"]
