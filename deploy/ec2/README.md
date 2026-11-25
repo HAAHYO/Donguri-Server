@@ -10,6 +10,8 @@ Actions 수동 실행(main) → 위와 같음 (재배포)
 
 아래 준비는 **처음 한 번**만 한다. 준비 전(5단계의 Secrets 가 하나도 없음)에 `main` 에 머지하면 이미지는 GHCR 에 푸시되고 deploy job 은 "배포 건너뜀" 안내를 남긴 채 성공으로 끝난다. 5단계에서 Secrets 4개를 모두 등록하면 다음 `main` 머지부터 자동으로 배포된다.
 
+> 건너뛴 실행도 GitHub 의 Deployments(`production`)에는 **성공**으로 기록된다 (deploy job 이 environment 에 묶여 있어서). 실제 배포 여부는 그 실행의 요약에 "배포 건너뜀" 이 있는지, 로그에 `DEPLOY OK` 가 있는지로 확인한다. 5단계의 **Required reviewers** 를 켜면 건너뛸 실행에서도 승인 대기가 먼저 걸리므로, 승인 규칙은 Secrets 를 등록할 때 함께 켠다.
+
 ## 1. EC2 인스턴스
 
 - AMI: Amazon Linux 2023, 타입: `t3.small` 이상 (JVM 메모리 고려. 같은 인스턴스에 MySQL 도 띄우면 `t3.medium` 권장)
