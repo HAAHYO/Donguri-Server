@@ -26,7 +26,7 @@ Kotlin + Spring Boot 4 (Gradle Kotlin DSL, JDK 21) 백엔드.
 - `_workspace_archive/` — 끝난 작업의 `_workspace/` 보관본. `.claude/scripts/archive-workspace.sh` 로만 옮긴다 (gitignore, 지우지 않는다)
 
 ## 하네스: 혼자서도 리뷰받기
-팀원이 없으므로 리뷰어 역할을 분리된 에이전트가 맡는다. 한 줄 수정이나 질문이 아닌 모든 백엔드 작업은 `donguri-workflow` 스킬을 따른다.
+팀원이 없으므로 리뷰어 역할을 분리된 에이전트가 맡는다. 한 줄 수정이나 질문이 아닌 모든 백엔드 작업은 `safeflow-workflow` 스킬을 따른다.
 Kotlin 파일을 쓰거나 리뷰하기 전에는 항상 `kotlin-spring-conventions` 스킬을 읽는다.
 
 계획 → 구현+테스트 → 커밋 → **자가 QA**(`qa-inspector`) → PR → **셀프 리뷰**(`pr-reviewer`, GitHub에 코멘트) → 반영/거절 답글 → 재QA·재리뷰 → 사용자 확인 후 머지
@@ -37,7 +37,7 @@ Kotlin 파일을 쓰거나 리뷰하기 전에는 항상 `kotlin-spring-conventi
 |------|------|
 | `agents/qa-inspector` | 구현 컨텍스트 없이 검증 + 앱 실행 스모크 → `_workspace/qa-report.md` |
 | `agents/pr-reviewer` | 없는 팀원 대신 PR 리뷰 → GitHub 코멘트 + `_workspace/review-report.md` |
-| `skills/` | `donguri-workflow`, `self-qa`, `pr-review`, `review-response`, `git-commit-convention`, `kotlin-spring-conventions` |
+| `skills/` | `safeflow-workflow`, `self-qa`, `pr-review`, `review-response`, `git-commit-convention`, `kotlin-spring-conventions` |
 | `hooks/guard_git.py` (PreToolUse, `guard-git.sh` 로 실행) | main/develop 커밋·푸시, 일괄 스테이징, hook 우회, 잘못된 커밋 제목, 브랜치 전략에 맞지 않는 PR base(생성·수정·머지 모두), `gh api` 머지·ref 쓰기·저장소 설정 변경 차단. 현재 HEAD 기준 QA PASS 없이 `gh pr create`, 셀프 리뷰 필수 0건 없이 `gh pr merge` 차단 |
 | `scripts/smoke.sh` | QA 스모크: toolchain JDK로 앱 기동 → 요청 → 종료 |
 | `scripts/archive-workspace.sh` | 끝난 `_workspace/` 를 `_workspace_archive/<timestamp>/` 로 보관하고 빈 `_workspace/` 생성 |
