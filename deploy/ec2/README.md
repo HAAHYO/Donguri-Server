@@ -87,7 +87,7 @@ sudo chmod 600 /opt/donguri/.env
 
 GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 별도 Secret 이 필요 없다.
 
-배포 전 승인을 걸고 싶으면 같은 화면의 **Required reviewers** 를 켠다.
+배포 전 승인을 걸고 싶으면 같은 화면의 **Required reviewers** 를 켠다. 위 Secrets 4개를 등록할 때 함께 켠다 — Secrets 없이 먼저 켜면 배포를 건너뛸 실행마다 승인 대기가 걸린다.
 
 ## 6. 첫 배포와 확인
 

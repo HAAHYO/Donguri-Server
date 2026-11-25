@@ -132,7 +132,7 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Secrets 는 이 environment 에 등록한다. 승인 규칙이 필요하면 GitHub 설정에서 추가한다
+    # Secrets 는 이 environment 에 등록한다. 승인 규칙(Required reviewers)은 Secrets 를 등록할 때 함께 켠다 — 먼저 켜면 건너뛸 실행도 승인을 기다린다
     environment: production
     permissions:
       contents: read
