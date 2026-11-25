@@ -152,13 +152,18 @@ jobs:
           HAS_EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS != '' }}
         run: |
           missing=""
+          present=0
           for name in EC2_HOST EC2_USER EC2_SSH_KEY EC2_KNOWN_HOSTS; do
             flag="HAS_${name}"
-            [ "${!flag}" = "true" ] || missing="$missing $name"
+            if [ "${!flag}" = "true" ]; then
+              present=$((present + 1))
+            else
+              missing="$missing $name"
+            fi
           done
           if [ -z "$missing" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
-          elif [ "$missing" = " EC2_HOST EC2_USER EC2_SSH_KEY EC2_KNOWN_HOSTS" ]; then
+          elif [ "$present" -eq 0 ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             msg="배포 건너뜀: production environment 에 EC2 Secrets 가 없습니다. 이미지는 GHCR 에 푸시됐습니다. 준비 방법은 deploy/ec2/README.md"
             echo "::notice::$msg"
