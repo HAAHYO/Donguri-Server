@@ -80,6 +80,14 @@ class SecurityRulesTest(
     }
 
     @Test
+    fun `OpenAPI 문서 제목은 SafeFlow FDS API 이다`() {
+        mockMvc.get("/v3/api-docs").andExpect {
+            status { isOk() }
+            jsonPath("$.info.title") { value("SafeFlow FDS API") }
+        }
+    }
+
+    @Test
     fun `Authentication 의 name 은 username 이다`() {
         mockMvc
             .get("/test/whoami") { header(HttpHeaders.AUTHORIZATION, bearer(EmployeeRole.CRM_MARKETER)) }

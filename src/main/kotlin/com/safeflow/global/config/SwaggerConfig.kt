@@ -13,7 +13,7 @@ class SwaggerConfig {
     @Bean
     fun openApi(): OpenAPI =
         OpenAPI()
-            .info(Info().title("Donguri FDS API").description("하이브리드 FDS 및 오탐 고객 이탈 방어 시스템").version("v1"))
+            .info(Info().title("SafeFlow FDS API").description("하이브리드 FDS 및 오탐 고객 이탈 방어 시스템").version("v1"))
             .components(
                 Components().addSecuritySchemes(
                     BEARER_SCHEME,
