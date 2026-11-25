@@ -1,4 +1,4 @@
-# 저장소만으로 빌드한다 (Railway 는 저장소를 받아 이 파일로 빌드하고, CD 도 같은 파일로 이미지를 만든다).
+# 저장소만으로 빌드한다 (Render 는 저장소를 받아 이 파일로 빌드하고, CD 도 같은 파일로 이미지를 만든다).
 # 테스트는 CI 의 ./gradlew check 가 맡고, 여기서는 jar 만 만든다.
 FROM eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /src
