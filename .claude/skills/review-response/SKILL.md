@@ -11,7 +11,7 @@ description: "PR 리뷰 코멘트(셀프 리뷰어 pr-reviewer 또는 사용자 
 
 ```bash
 gh pr view --json number,url,headRefOid
-gh api graphql -f query='query($pr:Int!){repository(owner:"HAAHYO",name:"Donguri-Server"){pullRequest(number:$pr){reviewThreads(first:100){nodes{id isResolved isOutdated path line comments(first:20){nodes{databaseId author{login} body}}}}}}}' -F pr=<번호>
+gh api graphql -f query='query($pr:Int!){repository(owner:"HAAHYO",name:"SafeFlow-Server"){pullRequest(number:$pr){reviewThreads(first:100){nodes{id isResolved isOutdated path line comments(first:20){nodes{databaseId author{login} body}}}}}}}' -F pr=<번호>
 gh pr view <번호> --json reviews,comments   # 요약 리뷰/일반 코멘트
 ```
 
@@ -35,7 +35,7 @@ gh pr view <번호> --json reviews,comments   # 요약 리뷰/일반 코멘트
 ## 3. 답글
 
 ```bash
-gh api repos/HAAHYO/Donguri-Server/pulls/<번호>/comments/<databaseId>/replies -f body='<답글>'
+gh api repos/HAAHYO/SafeFlow-Server/pulls/<번호>/comments/<databaseId>/replies -f body='<답글>'
 ```
 
 ```

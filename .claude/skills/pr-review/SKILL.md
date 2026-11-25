@@ -72,7 +72,7 @@ diff를 읽은 뒤 반드시 주변 파일을 연다. 그 다음:
 ```
 
 ```bash
-gh api repos/HAAHYO/Donguri-Server/pulls/<번호>/reviews --input _workspace/review-payload.json
+gh api repos/HAAHYO/SafeFlow-Server/pulls/<번호>/reviews --input _workspace/review-payload.json
 ```
 
 `line` 은 diff에 포함된 줄이어야 한다(아니면 422). diff 밖의 문제는 요약 본문에 `파일:줄` 로 적는다.
@@ -81,9 +81,9 @@ gh api repos/HAAHYO/Donguri-Server/pulls/<번호>/reviews --input _workspace/rev
 
 ```bash
 # 스레드 목록 (isResolved 포함)
-gh api graphql -f query='query($pr:Int!){repository(owner:"HAAHYO",name:"Donguri-Server"){pullRequest(number:$pr){reviewThreads(first:100){nodes{id isResolved path line comments(first:20){nodes{databaseId author{login} body}}}}}}}' -F pr=<번호>
+gh api graphql -f query='query($pr:Int!){repository(owner:"HAAHYO",name:"SafeFlow-Server"){pullRequest(number:$pr){reviewThreads(first:100){nodes{id isResolved path line comments(first:20){nodes{databaseId author{login} body}}}}}}}' -F pr=<번호>
 # 답글
-gh api repos/HAAHYO/Donguri-Server/pulls/<번호>/comments/<comment databaseId>/replies -f body='확인했습니다. <해시>에서 해결됐어요.'
+gh api repos/HAAHYO/SafeFlow-Server/pulls/<번호>/comments/<comment databaseId>/replies -f body='확인했습니다. <해시>에서 해결됐어요.'
 # 해결
 gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<thread id>
 ```
