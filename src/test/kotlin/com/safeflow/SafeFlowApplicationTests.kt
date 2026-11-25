@@ -24,7 +24,7 @@ import kotlin.test.assertTrue
         "fds.jwt.secret=dGVzdC1vbmx5LWp3dC1zZWNyZXQta2V5LWZvci1kb25ndXJpLWZkcy0zMmJ5dGVz",
     ],
 )
-class DonguriApplicationTests(
+class SafeFlowApplicationTests(
     @Autowired private val context: ApplicationContext,
     @Autowired private val employeeRepository: EmployeeRepository,
     @Autowired private val mockMvc: MockMvc,
