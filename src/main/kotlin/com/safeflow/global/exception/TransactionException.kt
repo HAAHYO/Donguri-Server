@@ -1,9 +1,9 @@
 package com.safeflow.global.exception
 
-class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_FOUND)
+class TransactionNotFoundException : SafeFlowException(ErrorCode.TRANSACTION_NOT_FOUND)
 
-class TransactionNotBlockedException : DonguriException(ErrorCode.TRANSACTION_NOT_BLOCKED)
+class TransactionNotBlockedException : SafeFlowException(ErrorCode.TRANSACTION_NOT_BLOCKED)
 
-class TransactionAlreadyJudgedException : DonguriException(ErrorCode.TRANSACTION_ALREADY_JUDGED)
+class TransactionAlreadyJudgedException : SafeFlowException(ErrorCode.TRANSACTION_ALREADY_JUDGED)
 
-class InvalidOccurredAtException : DonguriException(ErrorCode.INVALID_INPUT)
+class InvalidOccurredAtException : SafeFlowException(ErrorCode.INVALID_INPUT)

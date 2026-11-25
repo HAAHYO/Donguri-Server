@@ -1,5 +1,5 @@
 package com.safeflow.global.exception
 
-open class DonguriException(
+open class SafeFlowException(
     val errorCode: ErrorCode,
 ) : RuntimeException(errorCode.message)

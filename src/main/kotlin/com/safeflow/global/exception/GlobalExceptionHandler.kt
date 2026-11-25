@@ -19,8 +19,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @ExceptionHandler(DonguriException::class)
-    fun handleDonguri(e: DonguriException): ResponseEntity<ProblemDetail> = respond(ProblemDetails.of(e.errorCode))
+    @ExceptionHandler(SafeFlowException::class)
+    fun handleSafeFlow(e: SafeFlowException): ResponseEntity<ProblemDetail> = respond(ProblemDetails.of(e.errorCode))
 
     @ExceptionHandler(PessimisticLockingFailureException::class)
     fun handleLockConflict(e: PessimisticLockingFailureException): ResponseEntity<ProblemDetail> {

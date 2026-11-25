@@ -1,7 +1,7 @@
 package com.safeflow.global.config
 
-import com.safeflow.global.exception.DonguriException
 import com.safeflow.global.exception.ErrorCode
+import com.safeflow.global.exception.SafeFlowException
 import com.safeflow.global.security.jwt.JwtAuthenticationFilter
 import com.safeflow.global.security.jwt.JwtProperties
 import com.safeflow.global.security.jwt.JwtTokenProvider
@@ -70,9 +70,9 @@ class SecurityConfig {
             }.exceptionHandling {
                 it
                     .authenticationEntryPoint { request, response, _ ->
-                        exceptionResolver.resolveException(request, response, null, DonguriException(ErrorCode.UNAUTHORIZED))
+                        exceptionResolver.resolveException(request, response, null, SafeFlowException(ErrorCode.UNAUTHORIZED))
                     }.accessDeniedHandler { request, response, _ ->
-                        exceptionResolver.resolveException(request, response, null, DonguriException(ErrorCode.ACCESS_DENIED))
+                        exceptionResolver.resolveException(request, response, null, SafeFlowException(ErrorCode.ACCESS_DENIED))
                     }
             }.addFilterBefore(JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter::class.java)
         return http.build()

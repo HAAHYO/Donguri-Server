@@ -1,5 +1,5 @@
 package com.safeflow.global.exception
 
-class CustomerNotFoundException : DonguriException(ErrorCode.CUSTOMER_NOT_FOUND)
+class CustomerNotFoundException : SafeFlowException(ErrorCode.CUSTOMER_NOT_FOUND)
 
-class InsufficientBalanceException : DonguriException(ErrorCode.INSUFFICIENT_BALANCE)
+class InsufficientBalanceException : SafeFlowException(ErrorCode.INSUFFICIENT_BALANCE)
