@@ -8,7 +8,9 @@ main 머지     → CD image job(check → 빌드 → 스모크 → GHCR 푸시)
 Actions 수동 실행(main) → 위와 같음 (재배포)
 ```
 
-아래 준비는 **처음 한 번**만 한다. 준비 전에 `main` 에 머지하면 deploy job 은 "Secrets 가 없습니다" 로 실패하고, 이미지 푸시는 정상 완료된다.
+아래 준비는 **처음 한 번**만 한다. 준비 전(5단계의 Secrets 가 하나도 없음)에 `main` 에 머지하면 이미지는 GHCR 에 푸시되고 deploy job 은 "배포 건너뜀" 안내를 남긴 채 성공으로 끝난다. 5단계에서 Secrets 4개를 모두 등록하면 다음 `main` 머지부터 자동으로 배포된다.
+
+> 건너뛴 실행도 GitHub 의 Deployments(`production`)에는 **성공**으로 기록된다 (deploy job 이 environment 에 묶여 있어서). 실제 배포 여부는 그 실행의 요약에 "배포 건너뜀" 이 있는지, 로그에 `DEPLOY OK` 가 있는지로 확인한다. 5단계의 **Required reviewers** 를 켜면 건너뛸 실행에서도 승인 대기가 먼저 걸리므로, 승인 규칙은 Secrets 를 등록할 때 함께 켠다.
 
 ## 1. EC2 인스턴스
 
@@ -85,7 +87,7 @@ sudo chmod 600 /opt/donguri/.env
 
 GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 별도 Secret 이 필요 없다.
 
-배포 전 승인을 걸고 싶으면 같은 화면의 **Required reviewers** 를 켠다.
+배포 전 승인을 걸고 싶으면 같은 화면의 **Required reviewers** 를 켠다. 위 Secrets 4개를 등록할 때 함께 켠다 — Secrets 없이 먼저 켜면 배포를 건너뛸 실행마다 승인 대기가 걸린다.
 
 ## 6. 첫 배포와 확인
 
@@ -97,7 +99,8 @@ GHCR 이미지 pull 은 deploy job 의 임시 토큰으로 로그인하므로 �
 
 | 증상 (deploy job 로그) | 원인과 조치 |
 |------------------------|-------------|
-| `Secrets 가 없습니다: ...` | 5단계에서 빠진 이름을 등록 |
+| `배포 건너뜀: ... Secrets 가 없습니다` (job 은 성공) | 아직 준비 전. 배포하려면 5단계 |
+| `Secrets 가 일부만 있습니다. 빠진 것: ...` | 5단계에서 빠진 이름을 등록 (일부만 있으면 설정 실수로 보고 실패) |
 | `Host key verification failed` | `EC2_KNOWN_HOSTS` 가 비었거나 인스턴스가 바뀜 → 다시 `ssh-keyscan` |
 | `Permission denied (publickey)` | `authorized_keys` 에 공개키가 없거나 `EC2_USER` 가 다름 |
 | `Connection timed out` | 보안 그룹 22 포트 |
