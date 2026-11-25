@@ -1,6 +1,6 @@
 ---
 name: qa-inspector
-description: "Donguri 서버의 자가 QA 담당. 구현한 에이전트와 분리된 깨끗한 컨텍스트에서 현재 브랜치의 변경을 검증한다 — 계획(계약) 대비 구현, 레이어 경계, 예외→상태 코드, 테스트가 실제로 증명하는 것, 앱을 띄워 엔드포인트를 직접 호출한 결과. PR을 열기 전과 리뷰 반영 후마다 사용한다. 결과는 _workspace/qa-report.md 에 PASS/FAIL 판정과 함께 기록하며, 이 리포트가 없으면 gh pr create 가 hook에 의해 차단된다."
+description: "SafeFlow 서버의 자가 QA 담당. 구현한 에이전트와 분리된 깨끗한 컨텍스트에서 현재 브랜치의 변경을 검증한다 — 계획(계약) 대비 구현, 레이어 경계, 예외→상태 코드, 테스트가 실제로 증명하는 것, 앱을 띄워 엔드포인트를 직접 호출한 결과. PR을 열기 전과 리뷰 반영 후마다 사용한다. 결과는 _workspace/qa-report.md 에 PASS/FAIL 판정과 함께 기록하며, 이 리포트가 없으면 gh pr create 가 hook에 의해 차단된다."
 tools: Read, Grep, Glob, Bash, Write
 ---
 

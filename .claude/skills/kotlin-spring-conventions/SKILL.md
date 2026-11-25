@@ -1,9 +1,9 @@
 ---
 name: kotlin-spring-conventions
-description: "Donguri(Kotlin 2.3 / Spring Boot 4 / JDK 21) 코드 컨벤션 — 패키지 구조, 컨트롤러/서비스/DTO 역할, 예외와 에러 응답, 검증, 테스트 작성법. Kotlin 파일을 쓰거나 리뷰하기 전에 반드시 읽는다. 새 도메인 패키지를 추가할 때, '이 코드베이스에서는 X를 어떻게 하나' 질문에도 사용한다."
+description: "SafeFlow(Kotlin 2.3 / Spring Boot 4 / JDK 21) 코드 컨벤션 — 패키지 구조, 컨트롤러/서비스/DTO 역할, 예외와 에러 응답, 검증, 테스트 작성법. Kotlin 파일을 쓰거나 리뷰하기 전에 반드시 읽는다. 새 도메인 패키지를 추가할 때, '이 코드베이스에서는 X를 어떻게 하나' 질문에도 사용한다."
 ---
 
-# Donguri 컨벤션
+# SafeFlow 컨벤션
 
 포맷은 ktlint(`ktlint_official`, 140자)가 결정한다. 여기에는 ktlint가 못 잡는 구조 규칙만 둔다.
 
@@ -26,7 +26,7 @@ Boot 4는 자동설정과 테스트 슬라이스가 모듈별로 쪼개져 impor
 ## 패키지
 
 ```
-com.donguri
+com.safeflow
 ├── domain/
 │   └── <domain>/             예: transaction/
 │       ├── controller/       <Domain>Controller.kt
@@ -39,14 +39,14 @@ com.donguri
 └── global/
     ├── config/               SecurityConfig, SwaggerConfig, ClockConfig
     ├── entity/               BaseTimeEntity (createdAt/updatedAt, Hibernate 자동 기록)
-    ├── exception/            ErrorCode, DonguriException, GlobalExceptionHandler, ProblemDetails, <Domain>Exception.kt
+    ├── exception/            ErrorCode, SafeFlowException, GlobalExceptionHandler, ProblemDetails, <Domain>Exception.kt
     ├── init/                 DataInitializer (local 프로필 시딩)
     ├── security/             JwtPrincipal
     │   └── jwt/              JwtTokenProvider, JwtAuthenticationFilter, JwtProperties
     └── util/                 MaskingUtil
 ```
 
-도메인별 패키지(`domain/<domain>`) 안에서 레이어별 하위 패키지로 나눈다(VOID-GSM/TaekBaeWatShong_SERVER 구조를 따름). 최상위에 레이어 패키지(`com.donguri.controller`)를 만들지 않는다.
+도메인별 패키지(`domain/<domain>`) 안에서 레이어별 하위 패키지로 나눈다(VOID-GSM/TaekBaeWatShong_SERVER 구조를 따름). 최상위에 레이어 패키지(`com.safeflow.controller`)를 만들지 않는다.
 - 도메인 예외 클래스는 `global/exception/<Domain>Exception.kt` 에 도메인별로 모은다(클래스가 하나뿐이면 ktlint 규칙상 파일 이름은 클래스 이름).
 - 테스트는 대상 클래스와 같은 패키지에 둔다.
 
@@ -66,12 +66,12 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     TRANSACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "거래를 찾을 수 없습니다."),
 }
 
-open class DonguriException(val errorCode: ErrorCode) : RuntimeException(errorCode.message)
+open class SafeFlowException(val errorCode: ErrorCode) : RuntimeException(errorCode.message)
 
-class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_FOUND)
+class TransactionNotFoundException : SafeFlowException(ErrorCode.TRANSACTION_NOT_FOUND)
 ```
 
-- `GlobalExceptionHandler`(`@RestControllerAdvice`)가 `DonguriException` 과 검증 실패(`MethodArgumentNotValidException`)를 `ProblemDetail`(RFC 9457) + `code` 속성으로 변환한다. 첫 엔드포인트를 만들 때 함께 도입한다.
+- `GlobalExceptionHandler`(`@RestControllerAdvice`)가 `SafeFlowException` 과 검증 실패(`MethodArgumentNotValidException`)를 `ProblemDetail`(RFC 9457) + `code` 속성으로 변환한다. 첫 엔드포인트를 만들 때 함께 도입한다.
 - 서비스에서 `IllegalArgumentException`, `NoSuchElementException`, 맨 `RuntimeException` 을 던지지 않는다(500이 된다). `require`/`check`/`!!` 도 같은 이유로 서비스 경계에서는 쓰지 않는다.
 - 사용자에게 보이는 메시지는 한국어, 스택트레이스나 내부 클래스명은 응답에 넣지 않는다.
 

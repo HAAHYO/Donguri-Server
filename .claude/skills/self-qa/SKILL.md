@@ -1,6 +1,6 @@
 ---
 name: self-qa
-description: "Donguri 서버 변경에 대한 자가 QA 절차 — 계획 대비 구현, 레이어 경계, 예외→HTTP 상태, 테스트의 실제 검증력, 앱을 띄운 스모크 호출을 확인하고 _workspace/qa-report.md 에 PASS/FAIL 마커와 함께 기록한다. qa-inspector 에이전트의 주 스킬이며, 'QA 해줘', '검증해줘', '제대로 동작하는지 확인해줘', PR 전 점검, 엔드포인트가 예상과 다른 상태 코드를 줄 때 사용한다."
+description: "SafeFlow 서버 변경에 대한 자가 QA 절차 — 계획 대비 구현, 레이어 경계, 예외→HTTP 상태, 테스트의 실제 검증력, 앱을 띄운 스모크 호출을 확인하고 _workspace/qa-report.md 에 PASS/FAIL 마커와 함께 기록한다. qa-inspector 에이전트의 주 스킬이며, 'QA 해줘', '검증해줘', '제대로 동작하는지 확인해줘', PR 전 점검, 엔드포인트가 예상과 다른 상태 코드를 줄 때 사용한다."
 ---
 
 # 자가 QA

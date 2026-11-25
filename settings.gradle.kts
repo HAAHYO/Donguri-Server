@@ -1,1 +1,1 @@
-rootProject.name = "donguri"
+rootProject.name = "safeflow"

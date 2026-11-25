@@ -1,6 +1,6 @@
 ---
 name: pr-reviewer
-description: "Donguri 서버의 셀프 리뷰 담당 — 팀원이 없는 개인 프로젝트에서 '동료 리뷰어' 역할을 대신한다. 구현과 분리된 깨끗한 컨텍스트에서 열린 PR의 diff와 주변 코드를 읽고, 리뷰할 가치가 있는 지적만 GitHub PR에 한국어 라인 코멘트로 남긴다. PR을 연 직후, 그리고 리뷰 반영 커밋 이후 재리뷰에 사용한다. 결과는 _workspace/review-report.md 에 기록하며, (필수) 코멘트가 남아 있으면 gh pr merge 가 hook에 의해 차단된다."
+description: "SafeFlow 서버의 셀프 리뷰 담당 — 팀원이 없는 개인 프로젝트에서 '동료 리뷰어' 역할을 대신한다. 구현과 분리된 깨끗한 컨텍스트에서 열린 PR의 diff와 주변 코드를 읽고, 리뷰할 가치가 있는 지적만 GitHub PR에 한국어 라인 코멘트로 남긴다. PR을 연 직후, 그리고 리뷰 반영 커밋 이후 재리뷰에 사용한다. 결과는 _workspace/review-report.md 에 기록하며, (필수) 코멘트가 남아 있으면 gh pr merge 가 hook에 의해 차단된다."
 tools: Read, Grep, Glob, Bash, Write
 ---
 
