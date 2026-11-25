@@ -27,19 +27,13 @@ jobs:
       contents: read
       packages: write
     services:
-      # 이미지 스모크용 DB: 운영과 같은 prod 프로필로 기동해 Flyway 마이그레이션과 스키마 검증까지 확인한다
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: smoke
-          MYSQL_DATABASE: fds_bank
+      # 이미지 스모크용 DB: 운영 DB(TiDB Cloud Starter)와 같은 TiDB 로 prod 프로필을 기동해 Flyway 마이그레이션과 스키마 검증까지 확인한다.
+      # 단일 노드(unistore)로 뜨며 root 비밀번호는 없다. 이미지에 헬스체크용 클라이언트가 없어 준비 대기는 아래 단계에서 상태 포트로 한다
+      tidb:
+        image: pingcap/tidb:v8.5.5
         ports:
-          - 3306:3306
-        options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -psmoke"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
+          - 4000:4000
+          - 10080:10080
     steps:
       # 이 job 은 PR 코드도 빌드하므로 packages: write 토큰을 .git/config 에 남기지 않는다
       - uses: actions/checkout@v5
@@ -85,19 +79,31 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Wait for TiDB
+        run: |
+          for _ in $(seq 1 60); do
+            curl -sf --max-time 2 http://127.0.0.1:10080/status > /dev/null && exit 0
+            sleep 2
+          done
+          echo "TiDB 가 준비되지 않았습니다"
+          exit 1
+
       # 배포 가능한 이미지인지 확인: 실제로 컨테이너를 띄워 헬스체크가 UP 이어야 한다.
-      # Railway 처럼 PORT 를 주고 그 포트로 확인한다 (기본값 8080 이 아닌 포트로 떠야 통과)
+      # Render 처럼 PORT 를 주고 그 포트로 확인한다 (기본값 8080 이 아닌 포트로 떠야 통과).
+      # Render free 인스턴스와 같은 자원(512 MB, 0.1 CPU)으로 제한해 메모리 부족과 느린 기동을 배포 전에 잡는다
       - name: Smoke test image
         run: |
           docker run -d --name smoke --network host \
+            --memory 512m --cpus 0.1 \
             -e PORT=18081 \
             -e SPRING_PROFILES_ACTIVE=prod \
-            -e DB_URL='jdbc:mysql://127.0.0.1:3306/fds_bank?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&sessionVariables=innodb_lock_wait_timeout=3' \
+            -e DB_URL='jdbc:mysql://127.0.0.1:4000/fds_bank?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&sessionVariables=innodb_lock_wait_timeout=3' \
             -e DB_USERNAME=root \
-            -e DB_PASSWORD=smoke \
+            -e DB_PASSWORD= \
             -e JWT_SECRET="$(openssl rand -base64 32)" \
             safeflow-server:smoke
-          for _ in $(seq 1 60); do
+          # 0.1 CPU 에서는 기동이 수 분 걸릴 수 있어 최대 6분 기다린다
+          for _ in $(seq 1 180); do
             if curl -sf --max-time 2 http://127.0.0.1:18081/actuator/health | grep -q '"status":"UP"'; then
               echo "SMOKE OK"
               exit 0
