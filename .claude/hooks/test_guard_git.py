@@ -29,9 +29,16 @@ class GuardGitTest(unittest.TestCase):
         ).stdout.strip()
         os.makedirs(os.path.join(self.repo, "_workspace"))
         # gh pr view 대체: 선택자(번호/브랜치/current) → PR 정보
-        pr = lambda n, head, base: {"number": n, "headRefName": head, "baseRefName": base, "headRefOid": self.head}  # noqa: E731
+        passed = [{"__typename": "CheckRun", "name": "check", "status": "COMPLETED", "conclusion": "SUCCESS"},
+                  {"__typename": "CheckRun", "name": "image", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+        pr = lambda n, head, base, checks=passed: {"number": n, "headRefName": head, "baseRefName": base,  # noqa: E731
+                                                   "headRefOid": self.head, "statusCheckRollup": checks}
         self.prs = {"1": pr(1, "feat/x", "develop"), "current": pr(1, "feat/x", "develop"),
-                    "2": pr(2, "feat/y", "develop"), "3": pr(3, "feat/z", "main"), "4": pr(4, "develop", "main")}
+                    "2": pr(2, "feat/y", "develop"), "3": pr(3, "feat/z", "main"), "4": pr(4, "develop", "main"),
+                    "5": pr(5, "feat/f", "develop", [{"__typename": "CheckRun", "name": "image", "status": "COMPLETED", "conclusion": "FAILURE"}]),
+                    "6": pr(6, "feat/p", "develop", [{"__typename": "CheckRun", "name": "image", "status": "IN_PROGRESS", "conclusion": ""}]),
+                    "7": pr(7, "feat/n", "develop", []),
+                    "8": pr(8, "feat/s", "develop", [{"__typename": "StatusContext", "context": "ext", "state": "PENDING"}])}
         self.pr_json = os.path.join(self.tmp.name, "prs.json")
         with open(self.pr_json, "w", encoding="utf-8") as fh:
             json.dump(self.prs, fh)
@@ -386,6 +393,19 @@ class GuardGitTest(unittest.TestCase):
         self.assertEqual(self.run_hook("gh pr merge 1 --squash"), 2)
         self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
         self.assertEqual(self.run_hook("gh pr merge 1 --squash"), 0)
+
+    def test_pr_merge_requires_all_checks_passed(self):
+        self.feature_branch()
+        for n in ["5", "6", "7", "8"]:  # 실패, 진행 중, 체크 없음, 외부 상태 대기
+            with self.subTest(pr=n):
+                self.write("review-report.md", f"<!-- self-review pr={n} head={self.head} required_open=0 -->\n")
+                self.assertEqual(self.run_hook(f"gh pr merge {n} --merge"), 2)
+
+    def test_pr_merge_admin_blocked(self):
+        self.feature_branch()
+        self.write("review-report.md", f"<!-- self-review pr=1 head={self.head} required_open=0 -->\n")
+        self.assertEqual(self.run_hook("gh pr merge 1 --merge --admin"), 2)
+        self.assertEqual(self.run_hook("gh pr merge 1 --merge"), 0)
 
 
 if __name__ == "__main__":
