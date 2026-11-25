@@ -80,7 +80,7 @@ jobs:
           load: true
           tags: |
             ${{ steps.meta.outputs.tags }}
-            donguri-server:smoke
+            safeflow-server:smoke
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -96,7 +96,7 @@ jobs:
             -e DB_USERNAME=root \
             -e DB_PASSWORD=smoke \
             -e JWT_SECRET="$(openssl rand -base64 32)" \
-            donguri-server:smoke
+            safeflow-server:smoke
           for _ in $(seq 1 60); do
             if curl -sf --max-time 2 http://127.0.0.1:18081/actuator/health | grep -q '"status":"UP"'; then
               echo "SMOKE OK"
