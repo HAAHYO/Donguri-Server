@@ -94,6 +94,9 @@ jobs:
       # 스왑도 512 MB 로 막아야 메모리 초과가 스왑으로 가려지지 않는다
       - name: Smoke test image
         run: |
+          # 첫 관리자 생성 경로도 운영과 같은 TiDB 위에서 돌린다. 비밀번호는 실행마다 새로 만들고 로그에서 가린다
+          admin_pw="$(openssl rand -hex 16)"
+          echo "::add-mask::$admin_pw"
           docker run -d --name smoke --network host \
             --memory 512m --memory-swap 512m --cpus 0.1 \
             -e PORT=18081 \
@@ -102,17 +105,27 @@ jobs:
             -e DB_USERNAME=root \
             -e DB_PASSWORD= \
             -e JWT_SECRET="$(openssl rand -base64 32)" \
+            -e FDS_ADMIN_USERNAME=smoke_admin \
+            -e FDS_ADMIN_PASSWORD="$admin_pw" \
             safeflow-server:smoke
           # 0.1 CPU 에서는 기동이 수 분 걸릴 수 있어 최대 6분 기다린다
+          up=false
           for _ in $(seq 1 180); do
             if curl -sf --max-time 2 http://127.0.0.1:18081/actuator/health | grep -q '"status":"UP"'; then
-              echo "SMOKE OK"
-              exit 0
+              up=true
+              break
             fi
             [ "$(docker inspect --format '{{.State.Running}}' smoke)" = "true" ] || break
             sleep 2
           done
-          echo "SMOKE FAILED — 컨테이너 로그:"
+          # 기동하면서 만든 첫 관리자로 로그인해 토큰을 받아야 통과한다 (0.1 CPU 의 bcrypt 검증을 고려해 넉넉히 기다린다)
+          if [ "$up" = true ] && curl -sf --max-time 60 -X POST http://127.0.0.1:18081/api/auth/login \
+              -H 'Content-Type: application/json' \
+              -d "{\"username\":\"smoke_admin\",\"password\":\"$admin_pw\"}" | grep -q '"accessToken"'; then
+            echo "SMOKE OK"
+            exit 0
+          fi
+          echo "SMOKE FAILED (health=$up) — 컨테이너 로그:"
           docker logs smoke
           exit 1
 
