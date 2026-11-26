@@ -85,7 +85,7 @@ class CareActionConcurrencyTest(
         val stored = careActionRepository.findById(careAction.id!!).get()
         assertEquals(CareActionStatus.SENT, stored.status)
         assertTrue(stored.sentBy!!.startsWith("crm_"))
-        val histories = sendHistoryRepository.findAllByCareActionIdOrderByIdDesc(careAction.id!!)
+        val histories = sendHistoryRepository.findAllByCareActionIdOrderByCreatedAtDescIdDesc(careAction.id!!)
         assertEquals(1, histories.size)
         assertEquals(stored.sentBy, histories.single().sentBy)
     }

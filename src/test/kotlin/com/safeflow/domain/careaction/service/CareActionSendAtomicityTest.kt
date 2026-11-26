@@ -87,6 +87,6 @@ class FailingSendHistoryTestConfig {
         object : CareActionSendHistoryRepository {
             override fun save(history: CareActionSendHistory): CareActionSendHistory = throw IllegalStateException("이력 저장 실패")
 
-            override fun findAllByCareActionIdOrderByIdDesc(careActionId: Long): List<CareActionSendHistory> = emptyList()
+            override fun findAllByCareActionIdOrderByCreatedAtDescIdDesc(careActionId: Long): List<CareActionSendHistory> = emptyList()
         }
 }
