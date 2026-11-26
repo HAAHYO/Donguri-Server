@@ -36,6 +36,19 @@ class CorsRulesTest(
     }
 
     @Test
+    fun `패턴에 맞는 Origin 의 preflight 도 200 과 그 Origin 을 돌려준다`() {
+        val origin = "https://pr-12.preview.example.com"
+        mockMvc
+            .options("/api/transactions") {
+                header(HttpHeaders.ORIGIN, origin)
+                header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
+            }.andExpect {
+                status { isOk() }
+                header { string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, origin) }
+            }
+    }
+
+    @Test
     fun `허용되지 않은 Origin 의 preflight 는 CORS 헤더 없이 403 을 반환한다`() {
         mockMvc
             .options("/api/transactions") {
