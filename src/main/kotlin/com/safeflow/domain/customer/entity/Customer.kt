@@ -52,10 +52,6 @@ class Customer(
         balance = (balance - amount).setScale(MONEY_SCALE, RoundingMode.HALF_UP)
     }
 
-    fun increaseChurnScore(delta: BigDecimal) {
-        churnScore = (churnScore + delta).min(BigDecimal.ONE).setScale(CHURN_SCALE, RoundingMode.HALF_UP)
-    }
-
     fun updateChurn(
         score: BigDecimal,
         reasonsJson: String,
