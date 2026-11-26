@@ -86,6 +86,20 @@ class CrmControllerTest(
     }
 
     @Test
+    fun `탐지로 생긴 대기 케어 조치는 그 거래의 FDS 상태와 오탐 아님을 추천 사유로 준다`() {
+        val customer = customer("강하은", "110-789-012306", "0.7000")
+        val warningTx = transaction(customer, FdsStatus.WARNING)
+        careActionRepository.save(CareAction(warningTx, "안심차단 서비스", "확인 중입니다."))
+
+        mockMvc.get("/api/crm/high-risk-customers") { header(HttpHeaders.AUTHORIZATION, "Bearer $marketer") }.andExpect {
+            status { isOk() }
+            jsonPath("$.items[0].pendingCareActions[0].transactionId") { value(warningTx.id) }
+            jsonPath("$.items[0].pendingCareActions[0].fdsStatus") { value("WARNING") }
+            jsonPath("$.items[0].pendingCareActions[0].isFalsePositive") { value(false) }
+        }
+    }
+
+    @Test
     fun `토큰이 없으면 401, CRM_MARKETER 가 아닌 FDS_ADMIN 은 403 이다`() {
         val admin = jwtTokenProvider.createAccessToken("fds_admin", EmployeeRole.FDS_ADMIN)
 
