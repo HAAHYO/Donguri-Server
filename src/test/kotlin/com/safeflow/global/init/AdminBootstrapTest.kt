@@ -1,5 +1,6 @@
 package com.safeflow.global.init
 
+import com.safeflow.domain.employee.entity.Employee
 import com.safeflow.domain.employee.entity.EmployeeRole
 import com.safeflow.domain.employee.repository.EmployeeRepository
 import org.junit.jupiter.api.Test
@@ -31,6 +32,17 @@ class AdminBootstrapTest(
         assertEquals(EmployeeRole.FDS_ADMIN, admin.role)
         assertTrue(admin.password.startsWith("{bcrypt}"))
         assertTrue(passwordEncoder.matches(PASSWORD, admin.password))
+    }
+
+    @Test
+    fun `이미 직원이 있으면 계정을 만들거나 비밀번호를 바꾸지 않는다`() {
+        val existing = employeeRepository.save(Employee("fds_admin", "{bcrypt}original", EmployeeRole.FDS_ADMIN, "이상거래탐지팀"))
+
+        bootstrap("fds_admin", PASSWORD).run(DefaultApplicationArguments())
+        bootstrap("another", PASSWORD).run(DefaultApplicationArguments())
+
+        assertEquals(listOf(existing.id), employeeRepository.findAll().map { it.id })
+        assertEquals("{bcrypt}original", employeeRepository.findAll().single().password)
     }
 
     private fun bootstrap(
