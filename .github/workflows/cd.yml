@@ -109,15 +109,23 @@ jobs:
             -e FDS_ADMIN_PASSWORD="$admin_pw" \
             safeflow-server:smoke
           # 0.1 CPU 에서는 기동이 수 분 걸릴 수 있어 최대 6분 기다린다
+          up=false
           for _ in $(seq 1 180); do
             if curl -sf --max-time 2 http://127.0.0.1:18081/actuator/health | grep -q '"status":"UP"'; then
-              echo "SMOKE OK"
-              exit 0
+              up=true
+              break
             fi
             [ "$(docker inspect --format '{{.State.Running}}' smoke)" = "true" ] || break
             sleep 2
           done
-          echo "SMOKE FAILED — 컨테이너 로그:"
+          # 기동하면서 만든 첫 관리자로 로그인해 토큰을 받아야 통과한다 (0.1 CPU 의 bcrypt 검증을 고려해 넉넉히 기다린다)
+          if [ "$up" = true ] && curl -sf --max-time 60 -X POST http://127.0.0.1:18081/api/auth/login \
+              -H 'Content-Type: application/json' \
+              -d "{\"username\":\"smoke_admin\",\"password\":\"$admin_pw\"}" | grep -q '"accessToken"'; then
+            echo "SMOKE OK"
+            exit 0
+          fi
+          echo "SMOKE FAILED (health=$up) — 컨테이너 로그:"
           docker logs smoke
           exit 1
 
