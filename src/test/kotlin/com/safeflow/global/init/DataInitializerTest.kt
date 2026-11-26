@@ -86,7 +86,7 @@ class DataInitializerTest(
     }
 
     @Test
-    fun `시드 고객의 이탈 점수는 모델로 계산되어 오탐 피해 고객이 고위험이고 근거 1순위가 오탐이다`() {
+    fun `시드 고객의 이탈 점수는 모델로 계산되어 오탐 피해 고객만 고위험이고 근거에 오탐이 있다`() {
         val json = JsonMapper.builder().build()
         val (victims, others) = customerRepository.findAll().partition { it.isFalsePositiveVictim }
 
@@ -95,5 +95,10 @@ class DataInitializerTest(
             assertEquals("recent_false_positive_count", json.readTree(it.churnReasons)[0]["feature"].asString())
         }
         assertTrue(others.all { it.churnScore < victims.minOf { v -> v.churnScore } })
+        others.forEach {
+            val reasons = json.readTree(it.churnReasons)
+            val features = (0 until reasons.size()).map { i -> reasons[i]["feature"].asString() }
+            assertTrue("recent_false_positive_count" !in features, "${it.name} 근거 $features")
+        }
     }
 }
