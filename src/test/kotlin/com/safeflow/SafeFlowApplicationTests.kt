@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -38,14 +39,9 @@ class SafeFlowApplicationTests(
 
     @Test
     fun `프로필 없이 기동하면 Flyway 로 스키마를 만들고 SQL 로그를 끈다`() {
-        assertEquals(
-            "1",
-            context
-                .getBean(Flyway::class.java)
-                .info()
-                .current()
-                .version.version,
-        )
+        val migrations = context.getBean(Flyway::class.java).info()
+        assertNotNull(migrations.current())
+        assertTrue(migrations.pending().isEmpty(), "적용되지 않은 마이그레이션이 없어야 한다")
         assertEquals("validate", context.environment.getProperty("spring.jpa.hibernate.ddl-auto"))
         assertFalse(context.environment.getProperty("spring.jpa.show-sql", Boolean::class.java, false))
         assertNull(context.environment.getProperty("spring.jpa.properties.hibernate.format_sql"))
