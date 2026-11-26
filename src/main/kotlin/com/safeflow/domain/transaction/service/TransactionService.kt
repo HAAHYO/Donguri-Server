@@ -4,6 +4,7 @@ import com.safeflow.domain.careaction.entity.CareAction
 import com.safeflow.domain.careaction.repository.CareActionRepository
 import com.safeflow.domain.careaction.service.CareRecommendation
 import com.safeflow.domain.customer.repository.CustomerRepository
+import com.safeflow.domain.customer.service.ChurnService
 import com.safeflow.domain.transaction.dto.request.SimulateTransactionRequest
 import com.safeflow.domain.transaction.dto.response.ShapReasonResponse
 import com.safeflow.domain.transaction.dto.response.SimulateTransactionResponse
@@ -34,6 +35,7 @@ class TransactionService(
     private val transactionRepository: TransactionRepository,
     private val careActionRepository: CareActionRepository,
     private val scoringEngine: FdsScoringEngine,
+    private val churnService: ChurnService,
     private val jsonMapper: JsonMapper,
     private val clock: Clock,
 ) {
@@ -54,7 +56,6 @@ class TransactionService(
             )
 
         if (result.status != FdsStatus.BLOCKED) customer.withdraw(amount)
-        CHURN_INCREASE[result.status]?.let(customer::increaseChurnScore)
 
         val reasons = result.topReasons.map { ShapReasonResponse(it.feature, it.shap) }
         val transaction =
@@ -71,6 +72,7 @@ class TransactionService(
                     occurredAt = occurredAt,
                 ),
             )
+        churnService.recalculate(customer)
         val careAction =
             CareRecommendation.forDetection(result.status)?.let {
                 careActionRepository.save(CareAction(transaction, it.product, it.message))
@@ -92,7 +94,7 @@ class TransactionService(
 
         transaction.isActualFraud = false
         customer.markFalsePositiveVictim()
-        customer.increaseChurnScore(FALSE_POSITIVE_CHURN_INCREASE)
+        churnService.recalculate(customer)
 
         val recommendation = CareRecommendation.forFalsePositive(customer)
         val careAction = careActionRepository.findIdByTransaction(transaction)?.let(careActionRepository::findByIdForUpdate)
@@ -116,12 +118,6 @@ class TransactionService(
             .map { ShapReasonResponse(it.feature, it.shap) }
 
     companion object {
-        private val CHURN_INCREASE =
-            mapOf(
-                FdsStatus.WARNING to BigDecimal("0.05"),
-                FdsStatus.BLOCKED to BigDecimal("0.10"),
-            )
-        private val FALSE_POSITIVE_CHURN_INCREASE = BigDecimal("0.30")
         private const val MONEY_SCALE = 2
         private val MIN_OCCURRED_AT = OffsetDateTime.of(2000, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
         private val MAX_OCCURRED_AT = OffsetDateTime.of(2100, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
