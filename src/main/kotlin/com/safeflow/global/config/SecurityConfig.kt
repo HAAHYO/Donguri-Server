@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
 import org.springframework.core.env.Profiles
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -20,13 +21,17 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
+import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.CorsConfigurationSource
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 import org.springframework.web.servlet.HandlerExceptionResolver
 import java.security.SecureRandom
+import java.time.Duration
 import java.util.Base64
 
 @Configuration
 @EnableMethodSecurity
-@EnableConfigurationProperties(JwtProperties::class)
+@EnableConfigurationProperties(JwtProperties::class, CorsProperties::class)
 class SecurityConfig {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -48,12 +53,25 @@ class SecurityConfig {
     }
 
     @Bean
+    fun corsConfigurationSource(properties: CorsProperties): CorsConfigurationSource {
+        val configuration =
+            CorsConfiguration().apply {
+                allowedOriginPatterns = properties.allowedOrigins.filter { it.isNotBlank() }
+                allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
+                allowedHeaders = listOf(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE)
+                maxAge = Duration.ofHours(1).seconds
+            }
+        return UrlBasedCorsConfigurationSource().apply { registerCorsConfiguration("/**", configuration) }
+    }
+
+    @Bean
     fun securityFilterChain(
         http: HttpSecurity,
         jwtTokenProvider: JwtTokenProvider,
         @Qualifier("handlerExceptionResolver") exceptionResolver: HandlerExceptionResolver,
     ): SecurityFilterChain {
         http
+            .cors { }
             .csrf { it.disable() }
             .httpBasic { it.disable() }
             .formLogin { it.disable() }

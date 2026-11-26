@@ -115,6 +115,7 @@ class TransactionNotFoundException : SafeFlowException(ErrorCode.TRANSACTION_NOT
 ## 보안
 
 - 허용 경로는 `SecurityConfig` 에 명시한 것(`POST /api/auth/login`, health, swagger, `/error`)뿐이고 나머지는 인증이 필요하다. 새 공개 경로는 그 목록에 추가하고 테스트한다.
+- CORS 허용 Origin 은 `fds.cors.allowed-origins`(`CORS_ALLOWED_ORIGINS`, 쉼표 구분, 패턴 가능)만 정한다. 코드에 Origin 을 쓰지 않는다. 쿠키 자격 증명은 허용하지 않는다(JWT 는 `Authorization` 헤더). 새 요청 헤더를 쓰면 `SecurityConfig` 의 허용 헤더에 추가하고 `CorsRulesTest` 에 케이스를 넣는다.
 - 역할 제한은 컨트롤러 메서드의 `@PreAuthorize("hasRole('FDS_ADMIN')")`. 권한 이름은 `ROLE_` + `EmployeeRole` 이름.
 - 현재 사용자는 `SecurityContextHolder` 의 principal `JwtPrincipal`(username, role).
 - 401/403 도 `ErrorCode.UNAUTHORIZED`/`ACCESS_DENIED` ProblemDetail 로 응답한다(`HandlerExceptionResolver` 위임).

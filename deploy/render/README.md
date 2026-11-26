@@ -50,11 +50,13 @@ DB_URL=jdbc:mysql://<HOST>:4000/safeflow?sslMode=VERIFY_IDENTITY&serverTimezone=
 DB_USERNAME=<접두사가 붙은 USERNAME>
 DB_PASSWORD=<PASSWORD>
 JWT_SECRET=<openssl rand -base64 32 결과>
+CORS_ALLOWED_ORIGINS=https://<프론트>.vercel.app
 ```
 
 - `sslMode=VERIFY_IDENTITY` 는 빼지 않는다. TiDB Cloud 는 TLS 가 아닌 접속을 거부한다. 인증서는 Let's Encrypt 라 JVM 기본 truststore 로 검증된다.
 - `sessionVariables=innodb_lock_wait_timeout=3` 도 빼지 않는다. 없으면 락 대기가 50초가 된다.
 - `JWT_SECRET` 이 없으면 prod 프로필은 기동하지 않는다.
+- `CORS_ALLOWED_ORIGINS` 는 브라우저에서 API 를 부를 프론트 주소다. 쉼표로 여러 개를 넣을 수 있고 `https://*.example.com` 같은 패턴도 된다. 비우면 앱은 뜨지만 브라우저 호출은 모두 CORS 로 막힌다. Vercel 미리보기 주소(`*.vercel.app`) 전체를 넣으면 다른 사람의 Vercel 앱도 호출할 수 있으므로, 프로덕션 도메인만 넣는다.
 - `PORT` 는 설정하지 않는다. Render 가 주고, 앱은 `server.port: ${PORT:8080}` 으로 그 포트에 뜬다.
 - `SPRING_PROFILES_ACTIVE`, Hikari 설정은 `render.yaml` 이 넣는다. 대시보드에서 바꾸지 않는다 (바꾸면 파일과 어긋난다).
 
@@ -68,6 +70,13 @@ JWT_SECRET=<openssl rand -base64 32 결과>
 
 1. 서비스 **Events** 에서 배포가 **Deploy live** 인지 확인한다.
 2. `curl https://<주소>/actuator/health` → `{"status":"UP"}` (잠들어 있었다면 첫 응답까지 약 3~4분 걸린다)
+3. 프론트 주소에서 CORS 가 열렸는지 preflight 로 확인한다. 응답이 `200` 이고 `access-control-allow-origin: https://<프론트>.vercel.app` 헤더가 있어야 한다:
+   ```
+   curl -si -X OPTIONS https://<주소>/api/transactions \
+     -H "Origin: https://<프론트>.vercel.app" \
+     -H "Access-Control-Request-Method: GET" \
+     -H "Access-Control-Request-Headers: Authorization"
+   ```
 
 ## 문제가 생겼을 때
 
@@ -80,6 +89,7 @@ JWT_SECRET=<openssl rand -base64 32 결과>
 | `Connections using insecure transport are prohibited` 류 | `DB_URL` 에 `sslMode=VERIFY_IDENTITY` 누락 |
 | `OutOfMemoryError` / 재시작 반복 | 512 MB 초과. CD 스모크가 같은 제한으로 기동을 확인하므로, 스모크는 통과했는데 운영에서만 나면 요청 처리 중 메모리 사용을 본다 |
 | `JWT_SECRET` 관련 기동 실패 | 2단계 변수 누락 |
+| 브라우저 콘솔에 `blocked by CORS policy`, 또는 API 가 본문 `Invalid CORS request` 로 403 | `CORS_ALLOWED_ORIGINS` 에 프론트 주소가 없거나 다름 (스킴 `https://` 포함, 끝 `/` 없이). 값을 고치면 Render 가 다시 배포한다 |
 
 ### 롤백과 DB 마이그레이션
 
