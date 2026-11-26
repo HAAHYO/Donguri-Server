@@ -45,6 +45,15 @@ class AdminBootstrapTest(
         assertEquals("{bcrypt}original", employeeRepository.findAll().single().password)
     }
 
+    @Test
+    fun `아이디나 비밀번호가 비어 있으면 아무 계정도 만들지 않는다`() {
+        bootstrap("", PASSWORD).run(DefaultApplicationArguments())
+        bootstrap("admin", "").run(DefaultApplicationArguments())
+        bootstrap("admin", "   ").run(DefaultApplicationArguments())
+
+        assertEquals(0, employeeRepository.count())
+    }
+
     private fun bootstrap(
         username: String,
         password: String,
