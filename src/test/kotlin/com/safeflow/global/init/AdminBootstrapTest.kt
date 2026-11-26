@@ -96,6 +96,14 @@ class AdminBootstrapTest(
         assertEquals(0, employeeRepository.count())
     }
 
+    @Test
+    fun `비밀번호가 72바이트를 넘으면 BCrypt 예외 대신 변수 이름이 든 메시지로 실패한다`() {
+        val error = assertThrows<IllegalStateException> { bootstrap("admin", "가".repeat(25)).run(DefaultApplicationArguments()) }
+
+        assertTrue(error.message!!.contains("FDS_ADMIN_PASSWORD"))
+        assertEquals(0, employeeRepository.count())
+    }
+
     private fun bootstrap(
         username: String,
         password: String,
