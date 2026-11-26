@@ -14,12 +14,14 @@ data class HighRiskCustomerResponse(
     @get:JsonProperty("isFalsePositiveVictim")
     val isFalsePositiveVictim: Boolean,
     val riskReasons: List<HighRiskReason>,
+    val churnReasons: List<ChurnReasonResponse>,
     val pendingCareActions: List<PendingCareActionResponse>,
 ) {
     companion object {
         fun from(
             customer: Customer,
             riskReasons: List<HighRiskReason>,
+            churnReasons: List<ChurnReasonResponse>,
             pendingCareActions: List<PendingCareActionResponse>,
         ) = HighRiskCustomerResponse(
             customerId = requireNotNull(customer.id),
@@ -29,6 +31,7 @@ data class HighRiskCustomerResponse(
             churnScore = customer.churnScore,
             isFalsePositiveVictim = customer.isFalsePositiveVictim,
             riskReasons = riskReasons,
+            churnReasons = churnReasons,
             pendingCareActions = pendingCareActions,
         )
     }
