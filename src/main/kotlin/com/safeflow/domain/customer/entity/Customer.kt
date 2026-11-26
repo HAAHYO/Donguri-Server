@@ -38,6 +38,8 @@ class Customer(
     var isFalsePositiveVictim: Boolean = false,
     @Column(nullable = false, precision = 6, scale = 4)
     var cardUsageChangeRate: BigDecimal = BigDecimal("0.0000"),
+    @Column(nullable = false, precision = 6, scale = 4)
+    var loginFreqChangeRate: BigDecimal = BigDecimal("0.0000"),
 ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
