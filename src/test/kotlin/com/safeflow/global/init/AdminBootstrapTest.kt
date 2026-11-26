@@ -80,6 +80,14 @@ class AdminBootstrapTest(
         assertEquals(0, employeeRepository.count())
     }
 
+    @Test
+    fun `아이디 앞뒤에 공백이 있으면 계정을 만들지 않고 실패한다`() {
+        val error = assertThrows<IllegalStateException> { bootstrap(" admin ", PASSWORD).run(DefaultApplicationArguments()) }
+
+        assertTrue(error.message!!.contains("FDS_ADMIN_USERNAME"))
+        assertEquals(0, employeeRepository.count())
+    }
+
     private fun bootstrap(
         username: String,
         password: String,
