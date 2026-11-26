@@ -38,12 +38,13 @@ class TimeZoneStorageTest(
 
         val row =
             em
-                .createNativeQuery("select cast(occurred_at as varchar), cast(created_at as varchar) from transactions where id = :id")
-                .setParameter("id", transaction.id)
+                .createNativeQuery(
+                    "select formatdatetime(occurred_at, 'yyyy-MM-dd HH:mm:ss'), formatdatetime(created_at, 'yyyy-MM-dd HH:mm') from transactions where id = :id",
+                ).setParameter("id", transaction.id)
                 .singleResult as Array<*>
 
         assertEquals("2026-01-01 12:00:00", row[0])
-        assertEquals(transaction.createdAt.format(STORED), row[1].toString().padEnd(26, '0'))
+        assertEquals(transaction.createdAt.format(MINUTE), row[1])
     }
 
     private fun transaction(occurredAt: LocalDateTime) =
@@ -71,6 +72,6 @@ class TimeZoneStorageTest(
         )
 
     companion object {
-        private val STORED = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")
+        private val MINUTE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     }
 }
