@@ -4,6 +4,8 @@ import com.safeflow.domain.careaction.repository.CareActionRepository
 import com.safeflow.domain.customer.entity.Customer
 import com.safeflow.domain.customer.entity.CustomerGrade
 import com.safeflow.domain.customer.repository.CustomerRepository
+import com.safeflow.domain.customer.service.ChurnScoringInput
+import com.safeflow.domain.customer.service.LogisticChurnScoringEngine
 import com.safeflow.domain.employee.entity.EmployeeRole
 import com.safeflow.domain.transaction.dto.request.SimulateTransactionRequest
 import com.safeflow.domain.transaction.repository.TransactionRepository
@@ -131,6 +133,59 @@ class TransactionConcurrencyTest(
             assertEquals(0, BigDecimal("900000").compareTo(locked.balance))
         }
         pool.shutdown()
+    }
+
+    @Test
+    fun `같은 고객의 동시 차단 거래 뒤 이탈 점수는 커밋된 차단 건수를 모두 반영한다`() {
+        val customer =
+            customerRepository.save(
+                Customer(
+                    name = "동시이탈",
+                    accountNumber = "110-999-000003",
+                    balance = BigDecimal("1000"),
+                    grade = CustomerGrade.GENERAL,
+                    avgTxAmount = BigDecimal("100000"),
+                    appLoginFreq = 10,
+                    churnScore = BigDecimal("0.1000"),
+                ),
+            )
+        val request =
+            SimulateTransactionRequest(
+                customerId = customer.id!!,
+                amount = BigDecimal("900000"),
+                isOverseas = true,
+                deviceChanged = true,
+                occurredAt = OffsetDateTime.of(2026, 11, 21, 3, 0, 0, 0, ZoneOffset.ofHours(9)),
+            )
+        val requests = 5
+        val start = CountDownLatch(1)
+        val pool = Executors.newFixedThreadPool(requests)
+        val futures =
+            (1..requests).map {
+                pool.submit<Result<Unit>> {
+                    start.await()
+                    runCatching { transactionService.simulate(request) }.map { }
+                }
+            }
+        start.countDown()
+        val results = futures.map { it.get(30, TimeUnit.SECONDS) }
+        pool.shutdown()
+        val expected =
+            LogisticChurnScoringEngine().score(
+                ChurnScoringInput(
+                    recentFalsePositiveCount = 0,
+                    isFalsePositiveVictim = false,
+                    recentBlockedCount = requests,
+                    recentWarningCount = 0,
+                    cardUsageChangeRate = BigDecimal.ZERO,
+                    loginFreqChangeRate = BigDecimal.ZERO,
+                    appLoginFreq = 10,
+                    grade = CustomerGrade.GENERAL,
+                ),
+            )
+
+        assertEquals(requests, results.count { it.isSuccess })
+        assertEquals(expected.churnScore, customerRepository.findById(customer.id!!).get().churnScore)
     }
 
     @Test

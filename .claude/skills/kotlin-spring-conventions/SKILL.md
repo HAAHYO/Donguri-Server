@@ -106,6 +106,7 @@ class TransactionNotFoundException : SafeFlowException(ErrorCode.TRANSACTION_NOT
 - 잔액·점수처럼 동시 요청이 같은 행을 바꾸는 로직은 `findByIdForUpdate`(`PESSIMISTIC_WRITE` + `lock.timeout`)로 읽고, 동시성 테스트(커밋되는 실제 트랜잭션, 스레드 풀)로 증명한다. 락 대기 초과는 409 `LOCK_CONFLICT`.
 - 금액은 `setScale(2)`, 점수는 `setScale(4)` 로 정규화해서 저장·응답한다.
 - 시각은 `LocalDateTime`(Asia/Seoul 기준)으로 다룬다. `hibernate.jdbc.time_zone` 이 Asia/Seoul 이라 JVM 기본 시간대도 Asia/Seoul 이어야 DB 에 변환 없이 저장된다 — 앱은 `main()`, 테스트는 Gradle `user.timezone` 이 고정한다. 새 실행 진입점을 만들면 같은 설정을 넣는다. 현재 시각은 `LocalDateTime.now(clock)` 으로 만든다.
+- 이탈 점수(`churnScore`)와 근거(`churnReasons`)는 `ChurnService.recalculate` 로만 바꾼다 — 고객 락을 잡은 트랜잭션 안(`MANDATORY`). 점수를 직접 더하거나 덮어쓰지 않는다. 고객 이탈 피처에 영향을 주는 변경(거래 저장, 오탐 판정, 활동 지표 갱신)을 추가하면 같은 트랜잭션에서 다시 계산한다. 모델은 `ChurnScoringEngine`(기본 `LogisticChurnScoringEngine`)이고, 근거는 정확한 Shapley 값(확률 단위) 상위 3개다.
 - `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
 - 스키마는 Flyway 가 관리한다. 엔티티를 바꾸면 같은 PR 에 `src/main/resources/db/migration/V<n>__<설명>.sql` 을 추가하고, 이미 적용된 마이그레이션은 고치지 않는다. Hibernate 는 `ddl-auto: validate` 로 일치 여부만 검사한다.
 - 마이그레이션은 MySQL 8 과 H2 MySQL 모드 양쪽에서 실행되는 SQL 로 쓴다. 테스트도 같은 마이그레이션으로 기동한다.
@@ -120,4 +121,5 @@ class TransactionNotFoundException : SafeFlowException(ErrorCode.TRANSACTION_NOT
 - 현재 사용자는 `SecurityContextHolder` 의 principal `JwtPrincipal`(username, role).
 - 401/403 도 `ErrorCode.UNAUTHORIZED`/`ACCESS_DENIED` ProblemDetail 로 응답한다(`HandlerExceptionResolver` 위임).
 - 고객 이름·계좌번호를 응답에 담을 때는 `MaskingUtil.name`/`accountNumber` 를 거친다(FDS_ADMIN 만 원본).
+  - 예외: `GET /api/crm/high-risk-customers` 는 CRM_MARKETER 전용이고 케어 발송에 실명·계좌가 필요해 원본을 준다(사용자 결정 2026-11-26). 원본을 주는 새 응답은 이렇게 호출 역할을 하나로 제한한 API 에서만 만든다.
 - 보안 테스트는 `@SpringBootTest` + `@AutoConfigureMockMvc`(`org.springframework.boot.webmvc.test.autoconfigure`)로 상태 코드와 `code` 를 단언한다.

@@ -54,32 +54,32 @@ class TransactionControllerTest(
     private val marketer = token(EmployeeRole.CRM_MARKETER)
 
     @Test
-    fun `NORMAL 거래는 잔액을 차감하고 이탈 점수와 케어 조치는 그대로다`() {
+    fun `NORMAL 거래는 잔액을 차감하고 이탈 점수를 모델로 다시 계산하며 케어 조치는 만들지 않는다`() {
         val customer = customer(balance = "1000000", churn = "0.1000")
 
         val body = simulate(customer.id, "50000", token = marketer).andExpect { status { isCreated() } }.body()
 
         assertEquals("NORMAL", body["fdsStatus"].asString())
         assertNumber("950000.00", body["balanceAfter"])
-        assertNumber("0.1000", body["churnScore"])
+        assertNumber("0.1192", body["churnScore"])
         assertEquals(false, body["careActionCreated"].asBoolean())
         assertEquals(0, careActionRepository.count())
     }
 
     @Test
-    fun `WARNING 거래는 잔액을 차감하고 이탈 점수를 올리며 PENDING 케어 조치를 만든다`() {
+    fun `WARNING 거래는 잔액을 차감하고 경고 건수를 반영해 이탈 점수를 다시 계산하며 PENDING 케어 조치를 만든다`() {
         val customer = customer(balance = "1000000", churn = "0.1000")
 
         val body = simulate(customer.id, "100000", overseas = true, device = true).andExpect { status { isCreated() } }.body()
 
         assertEquals("WARNING", body["fdsStatus"].asString())
         assertNumber("900000.00", body["balanceAfter"])
-        assertNumber("0.1500", body["churnScore"])
+        assertNumber("0.1419", body["churnScore"])
         assertCareAction(body["transactionId"].asLong(), "안심차단 서비스")
     }
 
     @Test
-    fun `BLOCKED 거래는 잔액을 차감하지 않고 이탈 점수를 올리며 PENDING 케어 조치를 만든다`() {
+    fun `BLOCKED 거래는 잔액을 차감하지 않고 차단 건수를 반영해 이탈 점수를 다시 계산하며 PENDING 케어 조치를 만든다`() {
         val customer = customer(balance = "1000", churn = "0.1000")
 
         val body =
@@ -90,7 +90,7 @@ class TransactionControllerTest(
         assertEquals("BLOCKED", body["fdsStatus"].asString())
         assertEquals(2, body["txHour"].asInt())
         assertNumber("1000.00", body["balanceAfter"])
-        assertNumber("0.2000", body["churnScore"])
+        assertNumber("0.1824", body["churnScore"])
         assertEquals(listOf("amount_ratio", "device_changed", "tx_hour"), features(body["shapReasons"]))
         assertCareAction(body["transactionId"].asLong(), "안심차단 서비스 + 우대금리 파킹통장")
     }
@@ -230,7 +230,7 @@ class TransactionControllerTest(
 
         assertEquals(false, body["isActualFraud"].asBoolean())
         assertEquals("BLOCKED", body["fdsStatus"].asString())
-        assertNumber("0.6000", body["churnScore"])
+        assertNumber("0.5987", body["churnScore"])
         em.flush()
         em.clear()
         val updated = customerRepository.findById(customer.id!!).get()
@@ -243,14 +243,14 @@ class TransactionControllerTest(
     }
 
     @Test
-    fun `케어 조치가 없던 차단 거래도 오탐 판정 시 케어 조치를 만들고 이탈 점수는 1 을 넘지 않는다`() {
-        val customer = customer(churn = "0.9500")
+    fun `케어 조치가 없던 차단 거래도 오탐 판정 시 케어 조치를 만들고 오탐을 반영해 이탈 점수를 다시 계산한다`() {
+        val customer = customer()
         val txId = blockedTransaction(customer.id)
         careActionRepository.deleteAll()
 
         val body = resolve(txId, admin).andExpect { status { isOk() } }.body()
 
-        assertNumber("1.0000", body["churnScore"])
+        assertNumber("0.6682", body["churnScore"])
         assertEquals("우대금리 파킹통장 + 수수료 면제 쿠폰", careActionRepository.findAll().single().recommendedProduct)
     }
 

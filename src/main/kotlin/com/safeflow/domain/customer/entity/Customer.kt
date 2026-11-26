@@ -36,6 +36,12 @@ class Customer(
     var churnScore: BigDecimal,
     @Column(nullable = false)
     var isFalsePositiveVictim: Boolean = false,
+    @Column(nullable = false, precision = 6, scale = 4)
+    var cardUsageChangeRate: BigDecimal = BigDecimal("0.0000"),
+    @Column(nullable = false, precision = 6, scale = 4)
+    var loginFreqChangeRate: BigDecimal = BigDecimal("0.0000"),
+    @Column(nullable = false, length = 1000)
+    var churnReasons: String = "[]",
 ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,8 +52,12 @@ class Customer(
         balance = (balance - amount).setScale(MONEY_SCALE, RoundingMode.HALF_UP)
     }
 
-    fun increaseChurnScore(delta: BigDecimal) {
-        churnScore = (churnScore + delta).min(BigDecimal.ONE).setScale(CHURN_SCALE, RoundingMode.HALF_UP)
+    fun updateChurn(
+        score: BigDecimal,
+        reasonsJson: String,
+    ) {
+        churnScore = score.setScale(CHURN_SCALE, RoundingMode.HALF_UP)
+        churnReasons = reasonsJson
     }
 
     fun markFalsePositiveVictim() {

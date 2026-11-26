@@ -19,7 +19,7 @@ Kotlin + Spring Boot 4 (Gradle Kotlin DSL, JDK 21) 백엔드.
 - `src/main/kotlin/com/safeflow` — 애플리케이션 코드
 - `src/test/kotlin/com/safeflow` — 테스트
 - `.github/workflows/ci.yml` — PR, main/develop 푸시 시 actionlint(워크플로)·shellcheck(`*.sh`) → hook 테스트 → `./gradlew check`. 린트는 CI 에서만 돈다(로컬 Stop hook 은 `./gradlew check` 만)
-- `.github/workflows/cd.yml` — PR 시 이미지 빌드+기동 스모크(푸시 없음). main/`v*` 태그 푸시 시 검증 후 GHCR 푸시
+- `.github/workflows/cd.yml` — PR·main 푸시 시 이미지 빌드 + TiDB 위 기동 스모크(첫 관리자 로그인까지). 테스트는 CI 가 맡고, 레지스트리 푸시는 없다(Render 가 Dockerfile 로 직접 빌드하고, CI `check` 와 CD `image` 가 모두 통과한 커밋만 배포)
 - `Dockerfile`, `render.yaml`, `deploy/render/` — 배포(무료 플랜만). Render 가 GitHub Actions 성공 후 `main` 을 같은 Dockerfile 로 빌드·배포하고, DB 는 TiDB Cloud Starter(MySQL 호환). 사전 준비는 `deploy/render/README.md`
 - `.claude/` — 에이전트 하네스 (권한, hook, 에이전트, 스킬)
 - `_workspace/` — 작업별 계획/리뷰 기록 (gitignore, 지우지 않는다)
