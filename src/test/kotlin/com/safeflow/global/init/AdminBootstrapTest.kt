@@ -88,6 +88,14 @@ class AdminBootstrapTest(
         assertEquals(0, employeeRepository.count())
     }
 
+    @Test
+    fun `아이디가 50자를 넘으면 DB 오류 대신 변수 이름이 든 메시지로 실패한다`() {
+        val error = assertThrows<IllegalStateException> { bootstrap("a".repeat(51), PASSWORD).run(DefaultApplicationArguments()) }
+
+        assertTrue(error.message!!.contains("FDS_ADMIN_USERNAME"))
+        assertEquals(0, employeeRepository.count())
+    }
+
     private fun bootstrap(
         username: String,
         password: String,
