@@ -65,6 +65,15 @@ class AdminBootstrapTest(
     }
 
     @Test
+    fun `계정을 만든 뒤 비밀번호만 지운 설정으로 재기동해도 실패하지 않는다`() {
+        bootstrap("admin", PASSWORD).run(DefaultApplicationArguments())
+
+        bootstrap("admin", "").run(DefaultApplicationArguments())
+
+        assertEquals(1, employeeRepository.count())
+    }
+
+    @Test
     fun `비밀번호가 12자 미만이면 계정을 만들지 않고 실패한다`() {
         assertThrows<IllegalStateException> { bootstrap("admin", "short-pass1").run(DefaultApplicationArguments()) }
 
