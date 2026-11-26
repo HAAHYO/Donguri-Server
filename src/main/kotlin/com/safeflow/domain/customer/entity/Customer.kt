@@ -40,6 +40,8 @@ class Customer(
     var cardUsageChangeRate: BigDecimal = BigDecimal("0.0000"),
     @Column(nullable = false, precision = 6, scale = 4)
     var loginFreqChangeRate: BigDecimal = BigDecimal("0.0000"),
+    @Column(nullable = false, length = 1000)
+    var churnReasons: String = "[]",
 ) : BaseTimeEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
