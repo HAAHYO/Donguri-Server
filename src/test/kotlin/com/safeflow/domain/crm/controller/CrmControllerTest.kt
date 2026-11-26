@@ -70,6 +70,20 @@ class CrmControllerTest(
         }
     }
 
+    @Test
+    fun `토큰이 없으면 401, CRM_MARKETER 가 아닌 FDS_ADMIN 은 403 이다`() {
+        val admin = jwtTokenProvider.createAccessToken("fds_admin", EmployeeRole.FDS_ADMIN)
+
+        mockMvc.get("/api/crm/high-risk-customers").andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("UNAUTHORIZED") }
+        }
+        mockMvc.get("/api/crm/high-risk-customers") { header(HttpHeaders.AUTHORIZATION, "Bearer $admin") }.andExpect {
+            status { isForbidden() }
+            jsonPath("$.code") { value("ACCESS_DENIED") }
+        }
+    }
+
     private fun customer(
         name: String,
         accountNumber: String,
