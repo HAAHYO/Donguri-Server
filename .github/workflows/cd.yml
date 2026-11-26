@@ -94,6 +94,9 @@ jobs:
       # 스왑도 512 MB 로 막아야 메모리 초과가 스왑으로 가려지지 않는다
       - name: Smoke test image
         run: |
+          # 첫 관리자 생성 경로도 운영과 같은 TiDB 위에서 돌린다. 비밀번호는 실행마다 새로 만들고 로그에서 가린다
+          admin_pw="$(openssl rand -hex 16)"
+          echo "::add-mask::$admin_pw"
           docker run -d --name smoke --network host \
             --memory 512m --memory-swap 512m --cpus 0.1 \
             -e PORT=18081 \
@@ -102,6 +105,8 @@ jobs:
             -e DB_USERNAME=root \
             -e DB_PASSWORD= \
             -e JWT_SECRET="$(openssl rand -base64 32)" \
+            -e FDS_ADMIN_USERNAME=smoke_admin \
+            -e FDS_ADMIN_PASSWORD="$admin_pw" \
             safeflow-server:smoke
           # 0.1 CPU 에서는 기동이 수 분 걸릴 수 있어 최대 6분 기다린다
           for _ in $(seq 1 180); do
