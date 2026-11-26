@@ -24,10 +24,13 @@ class AdminBootstrap(
 
     @Transactional
     override fun run(args: ApplicationArguments) {
-        if (properties.username.isBlank() || properties.password.isBlank()) return
+        if (properties.username.isBlank() && properties.password.isBlank()) return
         if (employeeRepository.count() > 0) {
             log.info("직원 계정이 이미 있어 첫 관리자 계정을 만들지 않습니다. FDS_ADMIN_PASSWORD 는 지워도 됩니다.")
             return
+        }
+        check(properties.username.isNotBlank() && properties.password.isNotBlank()) {
+            "FDS_ADMIN_USERNAME 과 FDS_ADMIN_PASSWORD 는 함께 설정해야 합니다."
         }
         check(properties.password.length >= MIN_PASSWORD_LENGTH) { "FDS_ADMIN_PASSWORD 는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다." }
 

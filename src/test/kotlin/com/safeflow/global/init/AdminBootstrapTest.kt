@@ -47,10 +47,19 @@ class AdminBootstrapTest(
     }
 
     @Test
-    fun `아이디나 비밀번호가 비어 있으면 아무 계정도 만들지 않는다`() {
-        bootstrap("", PASSWORD).run(DefaultApplicationArguments())
-        bootstrap("admin", "").run(DefaultApplicationArguments())
-        bootstrap("admin", "   ").run(DefaultApplicationArguments())
+    fun `아이디와 비밀번호가 모두 비어 있으면 아무 계정도 만들지 않는다`() {
+        bootstrap("", "").run(DefaultApplicationArguments())
+        bootstrap("  ", "   ").run(DefaultApplicationArguments())
+
+        assertEquals(0, employeeRepository.count())
+    }
+
+    @Test
+    fun `직원이 없을 때 아이디와 비밀번호 중 하나만 설정하면 계정을 만들지 않고 실패한다`() {
+        listOf("" to PASSWORD, "admin" to "", "admin" to "   ").forEach { (username, password) ->
+            val error = assertThrows<IllegalStateException> { bootstrap(username, password).run(DefaultApplicationArguments()) }
+            assertTrue(error.message!!.contains("FDS_ADMIN_USERNAME"))
+        }
 
         assertEquals(0, employeeRepository.count())
     }
