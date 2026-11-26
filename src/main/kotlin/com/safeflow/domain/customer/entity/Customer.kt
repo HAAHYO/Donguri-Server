@@ -56,6 +56,14 @@ class Customer(
         churnScore = (churnScore + delta).min(BigDecimal.ONE).setScale(CHURN_SCALE, RoundingMode.HALF_UP)
     }
 
+    fun updateChurn(
+        score: BigDecimal,
+        reasonsJson: String,
+    ) {
+        churnScore = score.setScale(CHURN_SCALE, RoundingMode.HALF_UP)
+        churnReasons = reasonsJson
+    }
+
     fun markFalsePositiveVictim() {
         isFalsePositiveVictim = true
     }
