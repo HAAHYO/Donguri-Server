@@ -19,6 +19,7 @@ import com.safeflow.global.exception.TransactionAlreadyJudgedException
 import com.safeflow.global.exception.TransactionNotBlockedException
 import com.safeflow.global.exception.TransactionNotFoundException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.json.JsonMapper
 import tools.jackson.module.kotlin.readValue
@@ -39,7 +40,7 @@ class TransactionService(
     private val jsonMapper: JsonMapper,
     private val clock: Clock,
 ) {
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     fun simulate(request: SimulateTransactionRequest): SimulateTransactionResponse {
         val customer = customerRepository.findByIdForUpdate(request.customerId) ?: throw CustomerNotFoundException()
         val amount = request.amount.setScale(MONEY_SCALE, RoundingMode.UNNECESSARY)
@@ -84,7 +85,7 @@ class TransactionService(
     fun findAll(): TransactionListResponse =
         TransactionListResponse(transactionRepository.findAllWithCustomer().map { TransactionResponse.from(it, reasonsOf(it)) })
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     fun resolveFalsePositive(transactionId: Long): TransactionResponse {
         val transaction = transactionRepository.findByIdForUpdate(transactionId) ?: throw TransactionNotFoundException()
         if (transaction.fdsStatus != FdsStatus.BLOCKED) throw TransactionNotBlockedException()
