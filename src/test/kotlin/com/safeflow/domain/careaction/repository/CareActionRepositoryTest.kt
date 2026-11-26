@@ -46,22 +46,35 @@ class CareActionRepositoryTest(
     }
 
     @Test
-    fun `고객별 조회는 지정한 고객들의 PENDING 케어 조치만 거래와 함께 최신순으로 돌려준다`() {
+    fun `고객별 조회는 지정한 고객들의 PENDING 케어 조치만 거래와 함께 마지막으로 계획된 순서로 돌려준다`() {
         val target = customerRepository.saveAndFlush(customer("110-000-000001"))
         val other = customerRepository.saveAndFlush(customer("110-000-000002"))
-        val older = careActionRepository.saveAndFlush(careAction(target))
-        val newer = careActionRepository.saveAndFlush(careAction(target))
+        val replanned = careActionRepository.saveAndFlush(careAction(target))
+        val warning = careActionRepository.saveAndFlush(careAction(target))
         val sent = careActionRepository.saveAndFlush(careAction(target).also { it.markSent("crm_marketer", 0) })
         careActionRepository.saveAndFlush(careAction(other))
-        setCreatedAt(older, LocalDateTime.of(2026, 1, 1, 10, 0, 0))
-        setCreatedAt(newer, LocalDateTime.of(2026, 1, 1, 12, 0, 0))
+        setTimes(replanned, created = LocalDateTime.of(2026, 1, 1, 9, 0, 0), updated = LocalDateTime.of(2026, 1, 1, 13, 0, 0))
+        setTimes(warning, created = LocalDateTime.of(2026, 1, 1, 12, 0, 0), updated = LocalDateTime.of(2026, 1, 1, 12, 0, 0))
         em.clear()
 
         val found = careActionRepository.findAllWithTransactionByCustomerIdInAndStatus(listOf(target.id!!), CareActionStatus.PENDING)
 
-        assertEquals(listOf(newer.id, older.id), found.map { it.id })
+        assertEquals(listOf(replanned.id, warning.id), found.map { it.id })
         assertEquals(false, sent.id in found.map { it.id })
         assertTrue(found.all { Hibernate.isInitialized(it.transaction) })
+    }
+
+    private fun setTimes(
+        careAction: CareAction,
+        created: LocalDateTime,
+        updated: LocalDateTime,
+    ) {
+        em
+            .createNativeQuery("update care_action set created_at = :created, updated_at = :updated where id = :id")
+            .setParameter("created", created)
+            .setParameter("updated", updated)
+            .setParameter("id", careAction.id)
+            .executeUpdate()
     }
 
     private fun setCreatedAt(
