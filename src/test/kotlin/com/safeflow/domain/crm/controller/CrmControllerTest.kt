@@ -84,6 +84,16 @@ class CrmControllerTest(
         }
     }
 
+    @Test
+    fun `고위험 고객이 없으면 빈 items 를 반환한다`() {
+        customer("박지훈", "110-456-789003", "0.5999")
+
+        mockMvc.get("/api/crm/high-risk-customers") { header(HttpHeaders.AUTHORIZATION, "Bearer $marketer") }.andExpect {
+            status { isOk() }
+            jsonPath("$.items") { isEmpty() }
+        }
+    }
+
     private fun customer(
         name: String,
         accountNumber: String,
