@@ -58,6 +58,24 @@ class CorsRulesTest(
             }
     }
 
+    @Test
+    fun `허용되지 않은 Origin 의 실제 요청은 인증 전에 CORS 헤더 없이 403 을 반환한다`() {
+        mockMvc
+            .get("/api/transactions") { header(HttpHeaders.ORIGIN, "https://evil.example.com") }
+            .andExpect {
+                status { isForbidden() }
+                header { doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN) }
+            }
+    }
+
+    @Test
+    fun `Origin 헤더가 없는 요청은 CORS 와 무관하게 기존 인증 규칙을 따른다`() {
+        mockMvc.get("/api/transactions").andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("UNAUTHORIZED") }
+        }
+    }
+
     companion object {
         private const val ALLOWED = "https://allowed.example.com"
     }
