@@ -18,6 +18,9 @@ spring:
           time_zone: Asia/Seoul
 
 fds:
+  bootstrap-admin:
+    username: ${FDS_ADMIN_USERNAME:}
+    password: ${FDS_ADMIN_PASSWORD:}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   jwt:

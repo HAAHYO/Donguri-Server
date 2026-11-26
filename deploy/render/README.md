@@ -51,12 +51,15 @@ DB_USERNAME=<접두사가 붙은 USERNAME>
 DB_PASSWORD=<PASSWORD>
 JWT_SECRET=<openssl rand -base64 32 결과>
 CORS_ALLOWED_ORIGINS=https://<프론트>.vercel.app
+FDS_ADMIN_USERNAME=<첫 관리자 아이디>
+FDS_ADMIN_PASSWORD=<12자 이상 비밀번호>
 ```
 
 - `sslMode=VERIFY_IDENTITY` 는 빼지 않는다. TiDB Cloud 는 TLS 가 아닌 접속을 거부한다. 인증서는 Let's Encrypt 라 JVM 기본 truststore 로 검증된다.
 - `sessionVariables=innodb_lock_wait_timeout=3` 도 빼지 않는다. 없으면 락 대기가 50초가 된다.
 - `JWT_SECRET` 이 없으면 prod 프로필은 기동하지 않는다.
 - `CORS_ALLOWED_ORIGINS` 는 브라우저에서 API 를 부를 프론트 주소다. 쉼표로 여러 개를 넣을 수 있고 `https://*.example.com` 같은 패턴도 된다. 비우면 앱은 뜨지만 브라우저 호출은 모두 CORS 로 막힌다. Vercel 미리보기 주소(`*.vercel.app`) 전체를 넣으면 다른 사람의 Vercel 앱도 호출할 수 있으므로, 프로덕션 도메인만 넣는다.
+- `FDS_ADMIN_USERNAME`·`FDS_ADMIN_PASSWORD` 는 첫 로그인 계정이다. 운영 DB 에는 시드 데이터가 없으므로, 첫 기동 때 **직원이 0명이면** 이 값으로 FDS_ADMIN 계정 하나를 만든다. 직원이 0명일 때 설정이 잘못되면 기동하지 않는다 — 둘 중 하나만 넣음, 아이디 앞뒤 공백이나 50자 초과, 비밀번호 12자 미만이나 72바이트(UTF-8) 초과. 직원이 이미 있으면 아무것도 바꾸지 않으므로(비밀번호를 덮어쓰지 않음), 계정을 만든 뒤에는 두 변수를 지워도 된다 — 비밀번호를 대시보드에 남겨 두지 않는 편이 안전하다.
 - `PORT` 는 설정하지 않는다. Render 가 주고, 앱은 `server.port: ${PORT:8080}` 으로 그 포트에 뜬다.
 - `SPRING_PROFILES_ACTIVE`, Hikari 설정은 `render.yaml` 이 넣는다. 대시보드에서 바꾸지 않는다 (바꾸면 파일과 어긋난다).
 
@@ -77,6 +80,15 @@ CORS_ALLOWED_ORIGINS=https://<프론트>.vercel.app
      -H "Access-Control-Request-Method: GET" \
      -H "Access-Control-Request-Headers: Authorization"
    ```
+4. **Logs** 에 `첫 관리자 계정 <아이디> 을 만들었습니다` 가 있는지 보고, 그 계정으로 로그인해 `200` 과 `accessToken` 을 받는지 확인한다. 확인했으면 `FDS_ADMIN_PASSWORD`(와 `FDS_ADMIN_USERNAME`)를 지운다:
+   ```
+   read -rs ADMIN_PW   # 비밀번호를 화면·셸 히스토리에 남기지 않고 입력
+   curl -si -X POST https://<주소>/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d "{\"username\":\"<첫 관리자 아이디>\",\"password\":\"$ADMIN_PW\"}"
+   unset ADMIN_PW
+   ```
+   비밀번호에 `"` 나 `\` 가 있으면 이 JSON 이 깨져 계정이 있어도 `400` 이 나온다. 그때는 `jq -n --arg u <아이디> --arg p "$ADMIN_PW" '{username:$u,password:$p}'` 로 본문을 만들어 `-d @-` 로 넘긴다.
 
 ## 문제가 생겼을 때
 
@@ -89,6 +101,11 @@ CORS_ALLOWED_ORIGINS=https://<프론트>.vercel.app
 | `Connections using insecure transport are prohibited` 류 | `DB_URL` 에 `sslMode=VERIFY_IDENTITY` 누락 |
 | `OutOfMemoryError` / 재시작 반복 | 512 MB 초과. CD 스모크가 같은 제한으로 기동을 확인하므로, 스모크는 통과했는데 운영에서만 나면 요청 처리 중 메모리 사용을 본다 |
 | `JWT_SECRET` 관련 기동 실패 | 2단계 변수 누락 |
+| `FDS_ADMIN_PASSWORD 는 12자 이상이어야 합니다` 로 기동 실패 | 첫 관리자 비밀번호를 12자 이상으로 바꾼다 |
+| `FDS_ADMIN_PASSWORD 는 72바이트(UTF-8) 이하여야 합니다` 로 기동 실패 | BCrypt 한계다. 영문 기준 72자, 한글은 24자 이하로 줄인다 |
+| `FDS_ADMIN_USERNAME 과 FDS_ADMIN_PASSWORD 는 함께 설정해야 합니다` 로 기동 실패 | 직원이 없는데 둘 중 하나만 넣었다. 둘 다 넣거나 둘 다 지운다 |
+| `FDS_ADMIN_USERNAME 앞뒤에 공백이 있습니다` / `50자 이하여야 합니다` 로 기동 실패 | 대시보드 값의 앞뒤 공백을 지우고 50자 이하로 줄인다 |
+| 첫 배포 뒤 로그인이 401 | 첫 기동 때 `FDS_ADMIN_USERNAME`·`FDS_ADMIN_PASSWORD` 가 없었다. 두 값을 넣으면 다시 배포되면서, 직원이 0명이므로 계정이 만들어진다 |
 | 브라우저 콘솔에 `blocked by CORS policy`, 또는 API 가 본문 `Invalid CORS request` 로 403 | `CORS_ALLOWED_ORIGINS` 에 프론트 주소가 없거나 다름 (스킴 `https://` 포함, 끝 `/` 없이). 값을 고치면 Render 가 다시 배포한다 |
 
 ### 롤백과 DB 마이그레이션
