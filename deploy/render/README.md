@@ -98,6 +98,8 @@ FDS_ADMIN_PASSWORD=<12자 이상 비밀번호>
 | `Connections using insecure transport are prohibited` 류 | `DB_URL` 에 `sslMode=VERIFY_IDENTITY` 누락 |
 | `OutOfMemoryError` / 재시작 반복 | 512 MB 초과. CD 스모크가 같은 제한으로 기동을 확인하므로, 스모크는 통과했는데 운영에서만 나면 요청 처리 중 메모리 사용을 본다 |
 | `JWT_SECRET` 관련 기동 실패 | 2단계 변수 누락 |
+| `FDS_ADMIN_PASSWORD 는 12자 이상이어야 합니다` 로 기동 실패 | 첫 관리자 비밀번호를 12자 이상으로 바꾼다 |
+| 첫 배포 뒤 로그인이 401 | 첫 기동 때 `FDS_ADMIN_USERNAME`·`FDS_ADMIN_PASSWORD` 가 없었다. 두 값을 넣으면 다시 배포되면서, 직원이 0명이므로 계정이 만들어진다 |
 | 브라우저 콘솔에 `blocked by CORS policy`, 또는 API 가 본문 `Invalid CORS request` 로 403 | `CORS_ALLOWED_ORIGINS` 에 프론트 주소가 없거나 다름 (스킴 `https://` 포함, 끝 `/` 없이). 값을 고치면 Render 가 다시 배포한다 |
 
 ### 롤백과 DB 마이그레이션
