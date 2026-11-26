@@ -9,6 +9,8 @@ spring:
     show-sql: false
 
 fds:
+  cors:
+    allowed-origins: https://allowed.example.com
   jwt:
     secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQta2V5LWZvci1kb25ndXJpLWZkcy0zMmJ5dGVz
   seed:
