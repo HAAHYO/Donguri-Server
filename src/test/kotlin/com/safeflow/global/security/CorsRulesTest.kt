@@ -34,6 +34,18 @@ class CorsRulesTest(
             }
     }
 
+    @Test
+    fun `허용되지 않은 Origin 의 preflight 는 CORS 헤더 없이 403 을 반환한다`() {
+        mockMvc
+            .options("/api/transactions") {
+                header(HttpHeaders.ORIGIN, "https://evil.example.com")
+                header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
+            }.andExpect {
+                status { isForbidden() }
+                header { doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN) }
+            }
+    }
+
     companion object {
         private const val ALLOWED = "https://allowed.example.com"
     }
