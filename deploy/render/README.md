@@ -109,6 +109,23 @@ FDS_ADMIN_PASSWORD=<12자 이상 비밀번호>
 | 첫 배포 뒤 로그인이 401, Logs 에 `첫 관리자 계정 <아이디> 을 만들었습니다` 가 **있음** | 계정은 만들어졌고 입력한 아이디·비밀번호가 다르다. 재배포로는 고쳐지지 않는다(직원이 있으면 덮어쓰지 않음) — 아래 "첫 관리자 비밀번호를 잘못 넣었을 때" |
 | 브라우저 콘솔에 `blocked by CORS policy`, 또는 API 가 본문 `Invalid CORS request` 로 403 | `CORS_ALLOWED_ORIGINS` 에 프론트 주소가 없거나 다름 (스킴 `https://` 포함, 끝 `/` 없이). 값을 고치면 Render 가 다시 배포한다 |
 
+### 첫 관리자 비밀번호를 잘못 넣었을 때
+
+직원이 그 관리자 **한 명뿐일 때만** 쓰는 절차다. 계정을 지우고, 직원이 0명인 상태로 다시 기동해 새로 만든다.
+
+1. TiDB **SQL Editor** 에서 직원이 한 명뿐인지 확인한다. 두 명 이상이면 멈춘다 (다른 직원 계정까지 지우게 된다):
+   ```sql
+   SELECT id, username, role FROM safeflow.employee;
+   ```
+2. 그 관리자를 지운다. 직원을 참조하는 외래 키는 없다 (`care_action.sent_by` 는 아이디 문자열이다):
+   ```sql
+   DELETE FROM safeflow.employee WHERE username = '<첫 관리자 아이디>';
+   ```
+3. Render **Environment** 에서 `FDS_ADMIN_USERNAME`·`FDS_ADMIN_PASSWORD` 를 올바른 값으로 넣고 저장한다 (지웠다면 다시 넣는다). 저장하면 다시 배포된다.
+4. Logs 에 `첫 관리자 계정 <아이디> 을 만들었습니다` 가 다시 찍히는지 보고, "4. 첫 배포와 확인" 4단계로 로그인을 확인한 뒤 두 변수를 지운다.
+
+직원이 여러 명이 된 뒤의 비밀번호 재설정은 앱에 아직 없다.
+
 ### 롤백과 DB 마이그레이션
 
 새 배포가 기동 중에 실행한 Flyway 마이그레이션은 배포가 실패해도 DB 에 남는다.
