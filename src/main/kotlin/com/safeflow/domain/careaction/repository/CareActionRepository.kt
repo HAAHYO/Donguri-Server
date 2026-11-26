@@ -1,6 +1,7 @@
 package com.safeflow.domain.careaction.repository
 
 import com.safeflow.domain.careaction.entity.CareAction
+import com.safeflow.domain.careaction.entity.CareActionStatus
 import com.safeflow.domain.transaction.entity.Transaction
 import jakarta.persistence.LockModeType
 import jakarta.persistence.QueryHint
@@ -20,4 +21,13 @@ interface CareActionRepository : JpaRepository<CareAction, Long> {
 
     @Query("select c.id from CareAction c where c.transaction = :transaction")
     fun findIdByTransaction(transaction: Transaction): Long?
+
+    @Query(
+        "select c from CareAction c join fetch c.transaction " +
+            "where c.customer.id in :customerIds and c.status = :status order by c.updatedAt desc, c.id desc",
+    )
+    fun findAllWithTransactionByCustomerIdInAndStatus(
+        customerIds: Collection<Long>,
+        status: CareActionStatus,
+    ): List<CareAction>
 }

@@ -7,9 +7,16 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.jpa.repository.QueryHints
+import java.math.BigDecimal
 
 interface CustomerRepository : JpaRepository<Customer, Long> {
     fun findByAccountNumber(accountNumber: String): Customer?
+
+    @Query(
+        "select c from Customer c where c.isFalsePositiveVictim = true or c.churnScore >= :churnThreshold " +
+            "order by c.churnScore desc, c.id asc",
+    )
+    fun findHighRisk(churnThreshold: BigDecimal): List<Customer>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
