@@ -15,17 +15,10 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   image:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      packages: write
     services:
       # 이미지 스모크용 DB: 운영 DB(TiDB Cloud Starter)와 같은 TiDB 로 prod 프로필을 기동해 Flyway 마이그레이션과 스키마 검증까지 확인한다.
       # 단일 노드(unistore)로 뜨며 root 비밀번호는 없다. 이미지에 헬스체크용 클라이언트가 없어 준비 대기는 아래 단계에서 상태 포트로 한다
@@ -35,7 +28,7 @@ jobs:
           - 4000:4000
           - 10080:10080
     steps:
-      # 이 job 은 PR 코드도 빌드하므로 packages: write 토큰을 .git/config 에 남기지 않는다
+      # 이 job 은 PR 코드도 빌드하므로 토큰을 .git/config 에 남기지 않는다
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
