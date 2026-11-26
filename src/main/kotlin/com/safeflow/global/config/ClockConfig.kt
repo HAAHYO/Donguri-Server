@@ -8,5 +8,9 @@ import java.time.ZoneId
 @Configuration
 class ClockConfig {
     @Bean
-    fun clock(): Clock = Clock.system(ZoneId.of("Asia/Seoul"))
+    fun clock(): Clock = Clock.system(ZONE)
+
+    companion object {
+        val ZONE: ZoneId = ZoneId.of("Asia/Seoul")
+    }
 }
