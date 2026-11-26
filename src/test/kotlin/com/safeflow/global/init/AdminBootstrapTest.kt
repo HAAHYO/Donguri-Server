@@ -4,6 +4,7 @@ import com.safeflow.domain.employee.entity.Employee
 import com.safeflow.domain.employee.entity.EmployeeRole
 import com.safeflow.domain.employee.repository.EmployeeRepository
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
@@ -50,6 +51,13 @@ class AdminBootstrapTest(
         bootstrap("", PASSWORD).run(DefaultApplicationArguments())
         bootstrap("admin", "").run(DefaultApplicationArguments())
         bootstrap("admin", "   ").run(DefaultApplicationArguments())
+
+        assertEquals(0, employeeRepository.count())
+    }
+
+    @Test
+    fun `비밀번호가 12자 미만이면 계정을 만들지 않고 실패한다`() {
+        assertThrows<IllegalStateException> { bootstrap("admin", "short-pass1").run(DefaultApplicationArguments()) }
 
         assertEquals(0, employeeRepository.count())
     }
