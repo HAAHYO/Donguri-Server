@@ -24,7 +24,7 @@ interface CareActionRepository : JpaRepository<CareAction, Long> {
 
     @Query(
         "select c from CareAction c join fetch c.transaction " +
-            "where c.customer.id in :customerIds and c.status = :status order by c.createdAt desc, c.id desc",
+            "where c.customer.id in :customerIds and c.status = :status order by c.updatedAt desc, c.id desc",
     )
     fun findAllWithTransactionByCustomerIdInAndStatus(
         customerIds: Collection<Long>,
