@@ -48,7 +48,7 @@ class CareActionService(
     fun findSendHistory(id: Long): CareActionSendHistoryListResponse {
         if (!careActionRepository.existsById(id)) throw CareActionNotFoundException()
         return CareActionSendHistoryListResponse(
-            sendHistoryRepository.findAllByCareActionIdOrderByIdDesc(id).map(CareActionSendHistoryResponse::from),
+            sendHistoryRepository.findAllByCareActionIdOrderByCreatedAtDescIdDesc(id).map(CareActionSendHistoryResponse::from),
         )
     }
 }

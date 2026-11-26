@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.jpa.repository.QueryHints
 
 interface TransactionRepository : JpaRepository<Transaction, Long> {
-    @Query("select t from Transaction t join fetch t.customer order by t.id desc")
+    @Query("select t from Transaction t join fetch t.customer order by t.createdAt desc, t.id desc")
     fun findAllWithCustomer(): List<Transaction>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.jpa.repository.QueryHints
 
 interface CareActionRepository : JpaRepository<CareAction, Long> {
-    @Query("select c from CareAction c join fetch c.customer order by c.id desc")
+    @Query("select c from CareAction c join fetch c.customer order by c.createdAt desc, c.id desc")
     fun findAllWithCustomer(): List<CareAction>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
