@@ -10,7 +10,7 @@ spring:
 
 fds:
   cors:
-    allowed-origins: https://allowed.example.com
+    allowed-origins: "https://allowed.example.com, https://*.preview.example.com"
   jwt:
     secret: dGVzdC1vbmx5LWp3dC1zZWNyZXQta2V5LWZvci1kb25ndXJpLWZkcy0zMmJ5dGVz
   seed:
