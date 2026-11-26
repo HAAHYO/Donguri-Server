@@ -7,6 +7,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.options
 
 @SpringBootTest
@@ -43,6 +44,17 @@ class CorsRulesTest(
             }.andExpect {
                 status { isForbidden() }
                 header { doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN) }
+            }
+    }
+
+    @Test
+    fun `허용 Origin 이어도 토큰 없는 실제 요청은 CORS 헤더와 함께 401 을 반환한다`() {
+        mockMvc
+            .get("/api/transactions") { header(HttpHeaders.ORIGIN, ALLOWED) }
+            .andExpect {
+                status { isUnauthorized() }
+                header { string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED) }
+                jsonPath("$.code") { value("UNAUTHORIZED") }
             }
     }
 
