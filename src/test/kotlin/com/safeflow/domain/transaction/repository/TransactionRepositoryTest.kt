@@ -58,6 +58,18 @@ class TransactionRepositoryTest(
     }
 
     @Test
+    fun `실제 사기가 아니었다고 기록돼도 차단되지 않은 거래는 오탐으로 세지 않는다`() {
+        val customer = customerRepository.saveAndFlush(customer())
+        transactionRepository.save(transaction(customer, FdsStatus.NORMAL).also { it.isActualFraud = false })
+        transactionRepository.save(transaction(customer, FdsStatus.WARNING).also { it.isActualFraud = false })
+        transactionRepository.flush()
+
+        val counts = transactionRepository.countRecentFds(customer.id!!, LocalDateTime.now().minusDays(30))
+
+        assertEquals(RecentFdsCounts(warning = 1, blocked = 0, falsePositive = 0), counts)
+    }
+
+    @Test
     fun `기간 안에 거래가 없으면 모든 건수가 0 이다`() {
         val customer = customerRepository.saveAndFlush(customer())
 
