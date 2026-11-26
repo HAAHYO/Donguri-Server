@@ -100,6 +100,25 @@ class CrmControllerTest(
     }
 
     @Test
+    fun `고위험 고객마다 저장된 이탈 점수 근거를 기여도와 함께 준다`() {
+        val customer = customer("윤지우", "110-901-234508", "0.9309", falsePositiveVictim = true)
+        customer.updateChurn(
+            BigDecimal("0.9309"),
+            """[{"feature":"recent_false_positive_count","contribution":0.2871},{"feature":"recent_blocked_count","contribution":0.2651}]""",
+        )
+        customerRepository.flush()
+
+        mockMvc.get("/api/crm/high-risk-customers") { header(HttpHeaders.AUTHORIZATION, "Bearer $marketer") }.andExpect {
+            status { isOk() }
+            jsonPath("$.items[0].customerId") { value(customer.id) }
+            jsonPath("$.items[0].churnReasons.length()") { value(2) }
+            jsonPath("$.items[0].churnReasons[0].feature") { value("recent_false_positive_count") }
+            jsonPath("$.items[0].churnReasons[0].contribution") { value(0.2871) }
+            jsonPath("$.items[0].churnReasons[1].feature") { value("recent_blocked_count") }
+        }
+    }
+
+    @Test
     fun `토큰이 없으면 401, CRM_MARKETER 가 아닌 FDS_ADMIN 은 403 이다`() {
         val admin = jwtTokenProvider.createAccessToken("fds_admin", EmployeeRole.FDS_ADMIN)
 

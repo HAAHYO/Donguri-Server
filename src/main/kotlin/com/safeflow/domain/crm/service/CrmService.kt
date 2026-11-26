@@ -2,6 +2,7 @@ package com.safeflow.domain.crm.service
 
 import com.safeflow.domain.careaction.entity.CareActionStatus
 import com.safeflow.domain.careaction.repository.CareActionRepository
+import com.safeflow.domain.crm.dto.response.ChurnReasonResponse
 import com.safeflow.domain.crm.dto.response.HighRiskCustomerListResponse
 import com.safeflow.domain.crm.dto.response.HighRiskCustomerResponse
 import com.safeflow.domain.crm.dto.response.HighRiskReason
@@ -10,12 +11,15 @@ import com.safeflow.domain.customer.entity.Customer
 import com.safeflow.domain.customer.repository.CustomerRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.module.kotlin.readValue
 import java.math.BigDecimal
 
 @Service
 class CrmService(
     private val customerRepository: CustomerRepository,
     private val careActionRepository: CareActionRepository,
+    private val jsonMapper: JsonMapper,
 ) {
     @Transactional(readOnly = true)
     fun findHighRiskCustomers(): HighRiskCustomerListResponse {
@@ -31,6 +35,7 @@ class CrmService(
                 HighRiskCustomerResponse.from(
                     customer,
                     riskReasonsOf(customer),
+                    jsonMapper.readValue<List<ChurnReasonResponse>>(customer.churnReasons),
                     pendingByCustomer[customer.id].orEmpty().map(PendingCareActionResponse::from),
                 )
             },

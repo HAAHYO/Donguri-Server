@@ -1,0 +1,1 @@
+ALTER TABLE customer ADD COLUMN churn_reasons VARCHAR(1000) NOT NULL DEFAULT '[]';

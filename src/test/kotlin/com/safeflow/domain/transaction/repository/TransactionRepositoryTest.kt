@@ -39,6 +39,43 @@ class TransactionRepositoryTest(
         assertEquals(listOf(first.id, third.id, second.id), ids)
     }
 
+    @Test
+    fun `최근 건수는 기간 안의 해당 고객 거래만 경고·차단·오탐으로 센다`() {
+        val customer = customerRepository.saveAndFlush(customer())
+        val other = customerRepository.saveAndFlush(customer("110-000-000002"))
+        transactionRepository.save(transaction(customer, FdsStatus.NORMAL))
+        transactionRepository.save(transaction(customer, FdsStatus.WARNING))
+        transactionRepository.save(transaction(customer, FdsStatus.BLOCKED))
+        transactionRepository.save(transaction(customer, FdsStatus.BLOCKED).also { it.isActualFraud = false })
+        val old = transactionRepository.save(transaction(customer, FdsStatus.WARNING))
+        transactionRepository.save(transaction(other, FdsStatus.BLOCKED))
+        transactionRepository.flush()
+        setCreatedAt(old, LocalDateTime.now().minusDays(40))
+
+        val counts = transactionRepository.countRecentFds(customer.id!!, LocalDateTime.now().minusDays(30))
+
+        assertEquals(RecentFdsCounts(warning = 1, blocked = 2, falsePositive = 1), counts)
+    }
+
+    @Test
+    fun `실제 사기가 아니었다고 기록돼도 차단되지 않은 거래는 오탐으로 세지 않는다`() {
+        val customer = customerRepository.saveAndFlush(customer())
+        transactionRepository.save(transaction(customer, FdsStatus.NORMAL).also { it.isActualFraud = false })
+        transactionRepository.save(transaction(customer, FdsStatus.WARNING).also { it.isActualFraud = false })
+        transactionRepository.flush()
+
+        val counts = transactionRepository.countRecentFds(customer.id!!, LocalDateTime.now().minusDays(30))
+
+        assertEquals(RecentFdsCounts(warning = 1, blocked = 0, falsePositive = 0), counts)
+    }
+
+    @Test
+    fun `기간 안에 거래가 없으면 모든 건수가 0 이다`() {
+        val customer = customerRepository.saveAndFlush(customer())
+
+        assertEquals(RecentFdsCounts(0, 0, 0), transactionRepository.countRecentFds(customer.id!!, LocalDateTime.now().minusDays(30)))
+    }
+
     private fun setCreatedAt(
         transaction: Transaction,
         createdAt: LocalDateTime,
@@ -50,10 +87,10 @@ class TransactionRepositoryTest(
             .executeUpdate()
     }
 
-    private fun customer() =
+    private fun customer(accountNumber: String = "110-000-000001") =
         Customer(
             name = "테스트",
-            accountNumber = "110-000-000001",
+            accountNumber = accountNumber,
             balance = BigDecimal("1000000.00"),
             grade = CustomerGrade.GENERAL,
             avgTxAmount = BigDecimal("50000.00"),
@@ -61,15 +98,17 @@ class TransactionRepositoryTest(
             churnScore = BigDecimal("0.1000"),
         )
 
-    private fun transaction(customer: Customer) =
-        Transaction(
-            customer = customer,
-            amount = BigDecimal("100000.00"),
-            txHour = 13,
-            isOverseas = false,
-            deviceChanged = false,
-            fraudScore = BigDecimal("0.0500"),
-            fdsStatus = FdsStatus.NORMAL,
-            shapReasons = "[]",
-        )
+    private fun transaction(
+        customer: Customer,
+        status: FdsStatus = FdsStatus.NORMAL,
+    ) = Transaction(
+        customer = customer,
+        amount = BigDecimal("100000.00"),
+        txHour = 13,
+        isOverseas = false,
+        deviceChanged = false,
+        fraudScore = BigDecimal("0.0500"),
+        fdsStatus = status,
+        shapReasons = "[]",
+    )
 }

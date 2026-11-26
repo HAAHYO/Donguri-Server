@@ -3,6 +3,7 @@ package com.safeflow.global.init
 import com.safeflow.domain.customer.entity.Customer
 import com.safeflow.domain.customer.entity.CustomerGrade
 import com.safeflow.domain.customer.repository.CustomerRepository
+import com.safeflow.domain.customer.service.ChurnService
 import com.safeflow.domain.employee.entity.Employee
 import com.safeflow.domain.employee.entity.EmployeeRole
 import com.safeflow.domain.employee.repository.EmployeeRepository
@@ -27,6 +28,7 @@ class DataInitializer(
     private val customerRepository: CustomerRepository,
     private val transactionRepository: TransactionRepository,
     private val passwordEncoder: PasswordEncoder,
+    private val churnService: ChurnService,
     @Value("\${fds.seed.employee-password:}") private val seedPassword: String,
 ) : ApplicationRunner {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -60,21 +62,31 @@ class DataInitializer(
 
         val customers = customerRepository.saveAll(seedCustomers())
         transactionRepository.saveAll(seedTransactions(customers))
+        customers.forEach(churnService::recalculate)
         log.info("고객 {}명, 거래 {}건을 시딩했습니다.", customers.size, transactionRepository.count())
     }
 
     private fun seedCustomers(): List<Customer> =
         listOf(
-            customer("김민준", "110-234-567801", "152300000", CustomerGrade.VIP, "3200000", 42, "0.1200"),
-            customer("이서연", "110-345-678902", "98750000", CustomerGrade.VIP, "2450000", 8, "0.7800", falsePositiveVictim = true),
-            customer("박지훈", "110-456-789003", "45200000", CustomerGrade.GOLD, "850000", 25, "0.2100"),
-            customer("최수아", "110-567-890104", "31800000", CustomerGrade.GOLD, "620000", 4, "0.6600", falsePositiveVictim = true),
-            customer("정도윤", "110-678-901205", "27450000", CustomerGrade.GOLD, "540000", 18, "0.1800"),
-            customer("강하은", "110-789-012306", "5320000", CustomerGrade.GENERAL, "120000", 30, "0.0900"),
-            customer("조예준", "110-890-123407", "2180000", CustomerGrade.GENERAL, "85000", 12, "0.3500"),
-            customer("윤지우", "110-901-234508", "8940000", CustomerGrade.GENERAL, "210000", 3, "0.7100", falsePositiveVictim = true),
-            customer("장시우", "110-012-345609", "1250000", CustomerGrade.GENERAL, "45000", 22, "0.1500"),
-            customer("임채원", "110-123-456710", "210400000", CustomerGrade.VIP, "5100000", 35, "0.0800"),
+            customer("김민준", "110-234-567801", "152300000", CustomerGrade.VIP, "3200000", 42, card = "0.0500", login = "0.1000"),
+            customer("이서연", "110-345-678902", "98750000", CustomerGrade.VIP, "2450000", 8, true, "-0.4500", "-0.3000"),
+            customer("박지훈", "110-456-789003", "45200000", CustomerGrade.GOLD, "850000", 25, card = "-0.0500"),
+            customer("최수아", "110-567-890104", "31800000", CustomerGrade.GOLD, "620000", 4, true, "-0.6000", "-0.5000"),
+            customer("정도윤", "110-678-901205", "27450000", CustomerGrade.GOLD, "540000", 18, card = "0.1000", login = "0.0500"),
+            customer(
+                "강하은",
+                "110-789-012306",
+                "5320000",
+                CustomerGrade.GENERAL,
+                "120000",
+                30,
+                card = "-0.1000",
+                login = "-0.0500",
+            ),
+            customer("조예준", "110-890-123407", "2180000", CustomerGrade.GENERAL, "85000", 12, card = "-0.2000", login = "-0.1000"),
+            customer("윤지우", "110-901-234508", "8940000", CustomerGrade.GENERAL, "210000", 3, true, "-0.7000", "-0.4000"),
+            customer("장시우", "110-012-345609", "1250000", CustomerGrade.GENERAL, "45000", 22, login = "0.0200"),
+            customer("임채원", "110-123-456710", "210400000", CustomerGrade.VIP, "5100000", 35, card = "0.1500", login = "0.0800"),
         )
 
     private fun seedTransactions(c: List<Customer>): List<Transaction> =
@@ -173,8 +185,9 @@ class DataInitializer(
         grade: CustomerGrade,
         avgTxAmount: String,
         appLoginFreq: Int,
-        churnScore: String,
         falsePositiveVictim: Boolean = false,
+        card: String = "0.0000",
+        login: String = "0.0000",
     ) = Customer(
         name = name,
         accountNumber = accountNumber,
@@ -182,8 +195,10 @@ class DataInitializer(
         grade = grade,
         avgTxAmount = BigDecimal(avgTxAmount),
         appLoginFreq = appLoginFreq,
-        churnScore = BigDecimal(churnScore),
+        churnScore = BigDecimal("0.0000"),
         isFalsePositiveVictim = falsePositiveVictim,
+        cardUsageChangeRate = BigDecimal(card),
+        loginFreqChangeRate = BigDecimal(login),
     )
 
     private fun tx(
