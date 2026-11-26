@@ -11,7 +11,7 @@ description: "PR 리뷰 코멘트(셀프 리뷰어 pr-reviewer 또는 사용자 
 
 ```bash
 gh pr view --json number,url,headRefOid
-gh api graphql -f query='query($pr:Int!){repository(owner:"HAAHYO",name:"Donguri-Server"){pullRequest(number:$pr){reviewThreads(first:100){nodes{id isResolved isOutdated path line comments(first:20){nodes{databaseId author{login} body}}}}}}}' -F pr=<번호>
+gh api graphql -f query='query($pr:Int!){repository(owner:"HAAHYO",name:"SafeFlow-Server"){pullRequest(number:$pr){reviewThreads(first:100){nodes{id isResolved isOutdated path line comments(first:20){nodes{databaseId author{login} body}}}}}}}' -F pr=<번호>
 gh pr view <번호> --json reviews,comments   # 요약 리뷰/일반 코멘트
 ```
 
@@ -35,7 +35,7 @@ gh pr view <번호> --json reviews,comments   # 요약 리뷰/일반 코멘트
 ## 3. 답글
 
 ```bash
-gh api repos/HAAHYO/Donguri-Server/pulls/<번호>/comments/<databaseId>/replies -f body='<답글>'
+gh api repos/HAAHYO/SafeFlow-Server/pulls/<번호>/comments/<databaseId>/replies -f body='<답글>'
 ```
 
 ```
@@ -52,4 +52,4 @@ gh api repos/HAAHYO/Donguri-Server/pulls/<번호>/comments/<databaseId>/replies 
 
 ## 4. 다음 단계
 
-반영 커밋이 하나라도 있으면: push → qa-inspector 재검증 → pr-reviewer 재리뷰 (`donguri-workflow` Phase 7). 코드가 바뀐 뒤의 QA/리뷰 리포트는 이전 HEAD 기준이라 hook이 머지를 막는다.
+반영 커밋이 하나라도 있으면: push → pr-reviewer 재리뷰 (`safeflow-workflow` Phase 6). 코드가 바뀐 뒤의 리뷰 리포트는 이전 HEAD 기준이라 hook이 머지를 막는다.

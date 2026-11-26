@@ -5,8 +5,7 @@
 - gh pr create 의 base: 기능 브랜치 → develop, develop → main(릴리스)만 허용
 - 일괄 스테이징(git add -A / . / -u) 과 hook 우회(--no-verify) 금지
 - 커밋 메시지 컨벤션 검사 (`<type>: <한국어 요약>`)
-- gh pr create: 현재 HEAD에 대한 자가 QA 리포트(PASS)가 있어야 한다
-- gh pr merge: 현재 HEAD에 대한 셀프 리뷰 리포트(필수 0건)도 있어야 한다
+- gh pr merge: PR head 의 CI·CD 체크가 모두 통과하고, 셀프 리뷰 리포트(필수 0건)가 있어야 한다. --admin 금지
 - gh api 로 머지하는 우회 경로 금지
 
 명령 문자열을 정규식으로 훑지 않고 셸 토큰 단위로 파싱한다. `git -C <path>`, `VAR=x git`,
@@ -24,7 +23,6 @@ import sys
 COMMIT_TYPES = "feat|fix|refactor|test|docs|chore|build|ci|cd|perf|style|init"
 SUBJECT_RE = re.compile(rf"^({COMMIT_TYPES})(\([\w./-]+\))?!?: \S.*$")
 MAX_SUBJECT = 72
-QA_MARKER_RE = re.compile(r"<!--\s*qa-report\s+head=([0-9a-f]{7,40})\s+verdict=(PASS|FAIL)\s*-->")
 REVIEW_MARKER_RE = re.compile(r"<!--\s*self-review\s+pr=(\d+)\s+head=([0-9a-f]{7,40})\s+required_open=(\d+)\s*-->")
 # 브랜치 전략: 기능 브랜치 → PR → develop, 릴리스는 develop → PR → main (main 푸시가 CD를 트리거)
 INTEGRATION_BRANCH = "develop"
@@ -214,7 +212,7 @@ def pr_info(selector, cwd):
     if fake:
         with open(fake, encoding="utf-8") as fh:
             return json.load(fh).get(selector or "current")
-    cmd = ["gh", "pr", "view", *([selector] if selector else []), "--json", "number,baseRefName,headRefName,headRefOid"]
+    cmd = ["gh", "pr", "view", *([selector] if selector else []), "--json", "number,baseRefName,headRefName,headRefOid,statusCheckRollup"]
     try:
         out = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding="utf-8", timeout=20)
         return json.loads(out.stdout) if out.returncode == 0 else None
@@ -222,16 +220,22 @@ def pr_info(selector, cwd):
         return None
 
 
-def require_qa(cwd, head=None):
-    head = head or git("rev-parse", "HEAD", cwd=cwd)
-    qa = read_marker(os.path.join(cwd, "_workspace", "qa-report.md"), QA_MARKER_RE)
-    if not qa:
-        block("자가 QA 리포트(_workspace/qa-report.md)가 없습니다. qa-inspector 에이전트로 QA 를 먼저 실행하세요.")
-    if not same_sha(qa.group(1), head):
-        block(f"QA 리포트가 현재 HEAD({head[:7]})가 아니라 {qa.group(1)[:7]} 기준입니다. 바뀐 코드로 QA 를 다시 실행하세요.")
-    if qa.group(2) != "PASS":
-        block("QA 리포트 판정이 FAIL 입니다. BLOCKER 를 고치고 QA 를 다시 실행하세요.")
-    return head
+def require_checks(pr):
+    """PR head 의 CI·CD 체크가 모두 끝나 통과했어야 한다 (브랜치 보호의 필수 체크는 일부뿐이다)."""
+    checks = pr.get("statusCheckRollup") or []
+    if not checks:
+        block(f"PR #{pr['number']} 의 head 에 CI 체크가 없습니다. CI·CD 가 실행된 뒤 머지하세요.")
+    for c in checks:
+        name = c.get("name") or c.get("context") or "?"
+        if c.get("__typename") == "StatusContext":
+            ok, done = c["state"] == "SUCCESS", c["state"] not in ("PENDING", "EXPECTED")
+        else:
+            ok = c.get("conclusion") in ("SUCCESS", "NEUTRAL", "SKIPPED")
+            done = c.get("status") == "COMPLETED"
+        if not done:
+            block(f"PR #{pr['number']} 의 체크 '{name}' 가 아직 끝나지 않았습니다. 통과한 뒤 머지하세요.")
+        if not ok:
+            block(f"PR #{pr['number']} 의 체크 '{name}' 가 통과하지 않았습니다. 고친 뒤 머지하세요.")
 
 
 def require_review(cwd, head, pr_number):
@@ -444,9 +448,6 @@ def check_gh(sub, args, state, bodies):
             block(f"gh pr create 에 --base {expected} 를 명시하세요 {strategy_msg()}.")
         if bases[-1] != expected:
             block(f"'{head_branch}' 의 PR base 는 {expected} 여야 합니다 {strategy_msg()}.")
-        if heads and head_branch != git("rev-parse", "--abbrev-ref", "HEAD", cwd=cwd):
-            block(f"--head {head_branch} 는 현재 브랜치가 아닙니다. QA 리포트는 현재 HEAD 기준이므로 해당 브랜치로 전환해 PR 을 여세요.")
-        require_qa(cwd)
 
     elif action == "edit":
         bases = option_values(rest, ["-B", "--base"])
@@ -458,14 +459,16 @@ def check_gh(sub, args, state, bodies):
                 block(f"PR #{pr['number']}({pr['headRefName']}) 의 base 는 {expected_base(pr['headRefName'])} 여야 합니다 {strategy_msg()}.")
 
     elif action == "merge":
+        if any(a == "--admin" or a.startswith("--admin=") for a in rest):
+            block("gh pr merge --admin 은 브랜치 보호와 체크를 건너뛰므로 금지입니다.")
         pr = pr_info(selector, cwd)
         if not pr:
             block("머지할 PR 정보를 조회할 수 없어 게이트를 검사할 수 없습니다. PR 번호를 지정하세요.")
         if pr["baseRefName"] != expected_base(pr["headRefName"]):
             block(f"PR #{pr['number']} 은 {pr['headRefName']} → {pr['baseRefName']} 입니다. 브랜치 전략 {strategy_msg()}에 맞지 않아 머지할 수 없습니다.")
-        # QA/리뷰 리포트는 로컬 HEAD 가 아니라 실제로 머지될 PR head 기준이어야 한다
-        head = require_qa(cwd, pr["headRefOid"])
-        require_review(cwd, head, str(pr["number"]))
+        require_checks(pr)
+        # 리뷰 리포트는 로컬 HEAD 가 아니라 실제로 머지될 PR head 기준이어야 한다
+        require_review(cwd, pr["headRefOid"], str(pr["number"]))
 
 
 def check(command, cwd, depth=0):

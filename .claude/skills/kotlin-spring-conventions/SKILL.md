@@ -1,9 +1,9 @@
 ---
 name: kotlin-spring-conventions
-description: "Donguri(Kotlin 2.3 / Spring Boot 4 / JDK 21) 코드 컨벤션 — 패키지 구조, 컨트롤러/서비스/DTO 역할, 예외와 에러 응답, 검증, 테스트 작성법. Kotlin 파일을 쓰거나 리뷰하기 전에 반드시 읽는다. 새 도메인 패키지를 추가할 때, '이 코드베이스에서는 X를 어떻게 하나' 질문에도 사용한다."
+description: "SafeFlow(Kotlin 2.3 / Spring Boot 4 / JDK 21) 코드 컨벤션 — 패키지 구조, 컨트롤러/서비스/DTO 역할, 예외와 에러 응답, 검증, 테스트 작성법. Kotlin 파일을 쓰거나 리뷰하기 전에 반드시 읽는다. 새 도메인 패키지를 추가할 때, '이 코드베이스에서는 X를 어떻게 하나' 질문에도 사용한다."
 ---
 
-# Donguri 컨벤션
+# SafeFlow 컨벤션
 
 포맷은 ktlint(`ktlint_official`, 140자)가 결정한다. 여기에는 ktlint가 못 잡는 구조 규칙만 둔다.
 
@@ -26,7 +26,7 @@ Boot 4는 자동설정과 테스트 슬라이스가 모듈별로 쪼개져 impor
 ## 패키지
 
 ```
-com.donguri
+com.safeflow
 ├── domain/
 │   └── <domain>/             예: transaction/
 │       ├── controller/       <Domain>Controller.kt
@@ -39,14 +39,14 @@ com.donguri
 └── global/
     ├── config/               SecurityConfig, SwaggerConfig, ClockConfig
     ├── entity/               BaseTimeEntity (createdAt/updatedAt, Hibernate 자동 기록)
-    ├── exception/            ErrorCode, DonguriException, GlobalExceptionHandler, ProblemDetails, <Domain>Exception.kt
+    ├── exception/            ErrorCode, SafeFlowException, GlobalExceptionHandler, ProblemDetails, <Domain>Exception.kt
     ├── init/                 DataInitializer (local 프로필 시딩)
     ├── security/             JwtPrincipal
     │   └── jwt/              JwtTokenProvider, JwtAuthenticationFilter, JwtProperties
     └── util/                 MaskingUtil
 ```
 
-도메인별 패키지(`domain/<domain>`) 안에서 레이어별 하위 패키지로 나눈다(VOID-GSM/TaekBaeWatShong_SERVER 구조를 따름). 최상위에 레이어 패키지(`com.donguri.controller`)를 만들지 않는다.
+도메인별 패키지(`domain/<domain>`) 안에서 레이어별 하위 패키지로 나눈다(VOID-GSM/TaekBaeWatShong_SERVER 구조를 따름). 최상위에 레이어 패키지(`com.safeflow.controller`)를 만들지 않는다.
 - 도메인 예외 클래스는 `global/exception/<Domain>Exception.kt` 에 도메인별로 모은다(클래스가 하나뿐이면 ktlint 규칙상 파일 이름은 클래스 이름).
 - 테스트는 대상 클래스와 같은 패키지에 둔다.
 
@@ -66,12 +66,12 @@ enum class ErrorCode(val status: HttpStatus, val message: String) {
     TRANSACTION_NOT_FOUND(HttpStatus.NOT_FOUND, "거래를 찾을 수 없습니다."),
 }
 
-open class DonguriException(val errorCode: ErrorCode) : RuntimeException(errorCode.message)
+open class SafeFlowException(val errorCode: ErrorCode) : RuntimeException(errorCode.message)
 
-class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_FOUND)
+class TransactionNotFoundException : SafeFlowException(ErrorCode.TRANSACTION_NOT_FOUND)
 ```
 
-- `GlobalExceptionHandler`(`@RestControllerAdvice`)가 `DonguriException` 과 검증 실패(`MethodArgumentNotValidException`)를 `ProblemDetail`(RFC 9457) + `code` 속성으로 변환한다. 첫 엔드포인트를 만들 때 함께 도입한다.
+- `GlobalExceptionHandler`(`@RestControllerAdvice`)가 `SafeFlowException` 과 검증 실패(`MethodArgumentNotValidException`)를 `ProblemDetail`(RFC 9457) + `code` 속성으로 변환한다. 첫 엔드포인트를 만들 때 함께 도입한다.
 - 서비스에서 `IllegalArgumentException`, `NoSuchElementException`, 맨 `RuntimeException` 을 던지지 않는다(500이 된다). `require`/`check`/`!!` 도 같은 이유로 서비스 경계에서는 쓰지 않는다.
 - 사용자에게 보이는 메시지는 한국어, 스택트레이스나 내부 클래스명은 응답에 넣지 않는다.
 
@@ -105,6 +105,7 @@ class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_
 - 테스트: 매핑은 `@DataJpaTest`(`org.springframework.boot.data.jpa.test.autoconfigure`) + `@AutoConfigureTestDatabase(replace = NONE)` + `@ActiveProfiles("test")` — 임의 내장 DB 가 아니라 test 프로필의 H2 MySQL 모드로 검증한다.
 - 잔액·점수처럼 동시 요청이 같은 행을 바꾸는 로직은 `findByIdForUpdate`(`PESSIMISTIC_WRITE` + `lock.timeout`)로 읽고, 동시성 테스트(커밋되는 실제 트랜잭션, 스레드 풀)로 증명한다. 락 대기 초과는 409 `LOCK_CONFLICT`.
 - 금액은 `setScale(2)`, 점수는 `setScale(4)` 로 정규화해서 저장·응답한다.
+- 시각은 `LocalDateTime`(Asia/Seoul 기준)으로 다룬다. `hibernate.jdbc.time_zone` 이 Asia/Seoul 이라 JVM 기본 시간대도 Asia/Seoul 이어야 DB 에 변환 없이 저장된다 — 앱은 `main()`, 테스트는 Gradle `user.timezone` 이 고정한다. 새 실행 진입점을 만들면 같은 설정을 넣는다. 현재 시각은 `LocalDateTime.now(clock)` 으로 만든다.
 - `local` 프로필(초기 데이터 시딩)은 `bootRun` 에서만 기본으로 켜진다. 이미지(bootJar)는 프로필 기본값이 없다.
 - 스키마는 Flyway 가 관리한다. 엔티티를 바꾸면 같은 PR 에 `src/main/resources/db/migration/V<n>__<설명>.sql` 을 추가하고, 이미 적용된 마이그레이션은 고치지 않는다. Hibernate 는 `ddl-auto: validate` 로 일치 여부만 검사한다.
 - 마이그레이션은 MySQL 8 과 H2 MySQL 모드 양쪽에서 실행되는 SQL 로 쓴다. 테스트도 같은 마이그레이션으로 기동한다.
@@ -114,6 +115,7 @@ class TransactionNotFoundException : DonguriException(ErrorCode.TRANSACTION_NOT_
 ## 보안
 
 - 허용 경로는 `SecurityConfig` 에 명시한 것(`POST /api/auth/login`, health, swagger, `/error`)뿐이고 나머지는 인증이 필요하다. 새 공개 경로는 그 목록에 추가하고 테스트한다.
+- CORS 허용 Origin 은 `fds.cors.allowed-origins`(`CORS_ALLOWED_ORIGINS`, 쉼표 구분, 패턴 가능)만 정한다. 코드에 Origin 을 쓰지 않는다. 쿠키 자격 증명은 허용하지 않는다(JWT 는 `Authorization` 헤더). 새 요청 헤더를 쓰면 `SecurityConfig` 의 허용 헤더에 추가하고 `CorsRulesTest` 에 케이스를 넣는다.
 - 역할 제한은 컨트롤러 메서드의 `@PreAuthorize("hasRole('FDS_ADMIN')")`. 권한 이름은 `ROLE_` + `EmployeeRole` 이름.
 - 현재 사용자는 `SecurityContextHolder` 의 principal `JwtPrincipal`(username, role).
 - 401/403 도 `ErrorCode.UNAUTHORIZED`/`ACCESS_DENIED` ProblemDetail 로 응답한다(`HandlerExceptionResolver` 위임).
