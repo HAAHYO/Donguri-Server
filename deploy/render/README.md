@@ -113,14 +113,17 @@ FDS_ADMIN_PASSWORD=<12자 이상 비밀번호>
 
 직원이 그 관리자 **한 명뿐일 때만** 쓰는 절차다. 계정을 지우고, 직원이 0명인 상태로 다시 기동해 새로 만든다.
 
-1. TiDB **SQL Editor** 에서 직원이 한 명뿐인지 확인한다. 두 명 이상이면 멈춘다 (다른 직원 계정까지 지우게 된다):
+1. TiDB **SQL Editor** 에서 직원을 조회한다. 결과가 **정확히 1행이고 `role` 이 `FDS_ADMIN`** 일 때만 계속한다:
    ```sql
    SELECT id, username, role FROM safeflow.employee;
    ```
-2. 그 관리자를 지운다. 직원을 참조하는 외래 키는 없다 (`care_action.sent_by` 는 아이디 문자열이다):
+   - 0행이면 계정이 없는 것이다 — 이 절차가 아니라 위 표의 "쿼리가 0" 행대로 변수를 넣고 재배포한다.
+   - 2행 이상이면 멈춘다 (다른 직원 계정까지 지우게 된다).
+2. 1단계 결과의 `username` 을 그대로 복사해 그 관리자를 지운다 (직접 타이핑하면 대소문자·오타로 0행이 지워질 수 있다). 직원을 참조하는 외래 키는 없다 (`care_action.sent_by` 는 아이디 문자열이다):
    ```sql
-   DELETE FROM safeflow.employee WHERE username = '<첫 관리자 아이디>';
+   DELETE FROM safeflow.employee WHERE username = '<1단계의 username>';
    ```
+   `1 row affected` 가 아니면 멈추고 1단계부터 다시 확인한다.
 3. Render **Environment** 에서 `FDS_ADMIN_USERNAME`·`FDS_ADMIN_PASSWORD` 를 올바른 값으로 넣고 저장한다 (지웠다면 다시 넣는다). 저장하면 다시 배포된다.
 4. Logs 에 `첫 관리자 계정 <아이디> 을 만들었습니다` 가 다시 찍히는지 보고, "4. 첫 배포와 확인" 4단계로 로그인을 확인한 뒤 두 변수를 지운다.
 
