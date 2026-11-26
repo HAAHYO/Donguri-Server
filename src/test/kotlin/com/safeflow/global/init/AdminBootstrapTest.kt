@@ -5,18 +5,23 @@ import com.safeflow.domain.employee.entity.EmployeeRole
 import com.safeflow.domain.employee.repository.EmployeeRepository
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.DefaultApplicationArguments
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase
+import org.springframework.boot.test.system.CapturedOutput
+import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.security.crypto.factory.PasswordEncoderFactories
 import org.springframework.test.context.ActiveProfiles
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension::class)
 class AdminBootstrapTest(
     @Autowired private val employeeRepository: EmployeeRepository,
 ) {
@@ -102,6 +107,23 @@ class AdminBootstrapTest(
 
         assertTrue(error.message!!.contains("FDS_ADMIN_PASSWORD"))
         assertEquals(0, employeeRepository.count())
+    }
+
+    @Test
+    fun `첫 관리자를 만들 때 아이디는 로그에 남기고 비밀번호는 남기지 않는다`(output: CapturedOutput) {
+        bootstrap("admin", PASSWORD).run(DefaultApplicationArguments())
+
+        assertTrue(output.all.contains("첫 관리자 계정 admin 을 만들었습니다"))
+        assertFalse(output.all.contains(PASSWORD))
+    }
+
+    @Test
+    fun `설정 오류로 실패해도 메시지와 로그에 비밀번호가 남지 않는다`(output: CapturedOutput) {
+        val shortPassword = "short-pass1"
+        val error = assertThrows<IllegalStateException> { bootstrap("admin", shortPassword).run(DefaultApplicationArguments()) }
+
+        assertFalse(error.message!!.contains(shortPassword))
+        assertFalse(output.all.contains(shortPassword))
     }
 
     private fun bootstrap(
