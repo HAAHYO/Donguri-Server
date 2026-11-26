@@ -88,6 +88,7 @@ FDS_ADMIN_PASSWORD=<12자 이상 비밀번호>
      -d "{\"username\":\"<첫 관리자 아이디>\",\"password\":\"$ADMIN_PW\"}"
    unset ADMIN_PW
    ```
+   비밀번호에 `"` 나 `\` 가 있으면 이 JSON 이 깨져 계정이 있어도 `400` 이 나온다. 그때는 `jq -n --arg u <아이디> --arg p "$ADMIN_PW" '{username:$u,password:$p}'` 로 본문을 만들어 `-d @-` 로 넘긴다.
 
 ## 문제가 생겼을 때
 
