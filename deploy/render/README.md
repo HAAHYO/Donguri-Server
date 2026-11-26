@@ -70,6 +70,13 @@ CORS_ALLOWED_ORIGINS=https://<프론트>.vercel.app
 
 1. 서비스 **Events** 에서 배포가 **Deploy live** 인지 확인한다.
 2. `curl https://<주소>/actuator/health` → `{"status":"UP"}` (잠들어 있었다면 첫 응답까지 약 3~4분 걸린다)
+3. 프론트 주소에서 CORS 가 열렸는지 preflight 로 확인한다. 응답이 `200` 이고 `access-control-allow-origin: https://<프론트>.vercel.app` 헤더가 있어야 한다:
+   ```
+   curl -si -X OPTIONS https://<주소>/api/transactions \
+     -H "Origin: https://<프론트>.vercel.app" \
+     -H "Access-Control-Request-Method: GET" \
+     -H "Access-Control-Request-Headers: Authorization"
+   ```
 
 ## 문제가 생겼을 때
 
