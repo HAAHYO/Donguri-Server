@@ -17,7 +17,8 @@ interface TransactionRepository : JpaRepository<Transaction, Long> {
         "select new com.safeflow.domain.transaction.repository.RecentFdsCounts(" +
             "coalesce(sum(case when t.fdsStatus = com.safeflow.domain.transaction.entity.FdsStatus.WARNING then 1 else 0 end), 0), " +
             "coalesce(sum(case when t.fdsStatus = com.safeflow.domain.transaction.entity.FdsStatus.BLOCKED then 1 else 0 end), 0), " +
-            "coalesce(sum(case when t.isActualFraud = false then 1 else 0 end), 0)) " +
+            "coalesce(sum(case when t.fdsStatus = com.safeflow.domain.transaction.entity.FdsStatus.BLOCKED and t.isActualFraud = false " +
+            "then 1 else 0 end), 0)) " +
             "from Transaction t where t.customer.id = :customerId and t.createdAt >= :since",
     )
     fun countRecentFds(
