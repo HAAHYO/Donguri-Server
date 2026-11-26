@@ -9,10 +9,40 @@ import kotlin.math.exp
 @Component
 class LogisticChurnScoringEngine : ChurnScoringEngine {
     override fun score(input: ChurnScoringInput): ChurnScoringResult {
-        val deviations = features(input).map { it.coefficient * (it.value - it.baseline) }
+        val features = features(input)
+        val deviations = features.map { it.coefficient * (it.value - it.baseline) }
         val probability = sigmoid(INTERCEPT + deviations.sum())
-        return ChurnScoringResult(toScore(probability), emptyList())
+        val reasons =
+            shapleyValues(deviations)
+                .mapIndexed { i, contribution -> ChurnReason(features[i].name, toScore(contribution)) }
+                .filter { it.contribution.signum() > 0 }
+                .sortedByDescending { it.contribution }
+                .take(TOP_REASONS)
+        return ChurnScoringResult(toScore(probability), reasons)
     }
+
+    private fun shapleyValues(deviations: List<Double>): List<Double> {
+        val n = deviations.size
+        val coalitionProbability =
+            DoubleArray(1 shl n) { mask ->
+                sigmoid(INTERCEPT + deviations.indices.filter { mask and (1 shl it) != 0 }.sumOf { deviations[it] })
+            }
+        return deviations.indices.map { i ->
+            (0 until (1 shl n))
+                .filter { mask -> mask and (1 shl i) == 0 }
+                .sumOf { mask ->
+                    val size = Integer.bitCount(mask)
+                    weight(size, n) * (coalitionProbability[mask or (1 shl i)] - coalitionProbability[mask])
+                }
+        }
+    }
+
+    private fun weight(
+        size: Int,
+        n: Int,
+    ): Double = factorial(size) * factorial(n - size - 1) / factorial(n)
+
+    private fun factorial(k: Int): Double = (1..k).fold(1.0) { acc, x -> acc * x }
 
     private fun features(input: ChurnScoringInput): List<Feature> =
         listOf(
@@ -49,5 +79,6 @@ class LogisticChurnScoringEngine : ChurnScoringEngine {
 
         private const val INTERCEPT = -2.20
         private const val SCALE = 4
+        private const val TOP_REASONS = 3
     }
 }
