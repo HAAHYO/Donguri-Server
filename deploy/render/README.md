@@ -80,6 +80,12 @@ FDS_ADMIN_PASSWORD=<12자 이상 비밀번호>
      -H "Access-Control-Request-Method: GET" \
      -H "Access-Control-Request-Headers: Authorization"
    ```
+4. **Logs** 에 `첫 관리자 계정 <아이디> 을 만들었습니다` 가 있는지 보고, 그 계정으로 로그인해 `200` 과 `accessToken` 을 받는지 확인한다. 확인했으면 `FDS_ADMIN_PASSWORD`(와 `FDS_ADMIN_USERNAME`)를 지운다:
+   ```
+   curl -si -X POST https://<주소>/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"<첫 관리자 아이디>","password":"<비밀번호>"}'
+   ```
 
 ## 문제가 생겼을 때
 
