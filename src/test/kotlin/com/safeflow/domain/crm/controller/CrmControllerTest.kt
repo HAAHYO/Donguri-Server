@@ -71,6 +71,21 @@ class CrmControllerTest(
     }
 
     @Test
+    fun `고위험군에 든 이유는 해당하는 조건만 담는다`() {
+        val lowScoreVictim = customer("최수아", "110-567-890104", "0.1000", falsePositiveVictim = true)
+        val atThreshold = customer("정도윤", "110-678-901205", "0.6000")
+
+        mockMvc.get("/api/crm/high-risk-customers") { header(HttpHeaders.AUTHORIZATION, "Bearer $marketer") }.andExpect {
+            status { isOk() }
+            jsonPath("$.items.length()") { value(2) }
+            jsonPath("$.items[0].customerId") { value(atThreshold.id) }
+            jsonPath("$.items[0].riskReasons") { value(contains("HIGH_CHURN_SCORE")) }
+            jsonPath("$.items[1].customerId") { value(lowScoreVictim.id) }
+            jsonPath("$.items[1].riskReasons") { value(contains("FALSE_POSITIVE_VICTIM")) }
+        }
+    }
+
+    @Test
     fun `토큰이 없으면 401, CRM_MARKETER 가 아닌 FDS_ADMIN 은 403 이다`() {
         val admin = jwtTokenProvider.createAccessToken("fds_admin", EmployeeRole.FDS_ADMIN)
 
