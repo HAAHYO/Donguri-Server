@@ -120,4 +120,5 @@ class TransactionNotFoundException : SafeFlowException(ErrorCode.TRANSACTION_NOT
 - 현재 사용자는 `SecurityContextHolder` 의 principal `JwtPrincipal`(username, role).
 - 401/403 도 `ErrorCode.UNAUTHORIZED`/`ACCESS_DENIED` ProblemDetail 로 응답한다(`HandlerExceptionResolver` 위임).
 - 고객 이름·계좌번호를 응답에 담을 때는 `MaskingUtil.name`/`accountNumber` 를 거친다(FDS_ADMIN 만 원본).
+  - 예외: `GET /api/crm/high-risk-customers` 는 CRM_MARKETER 전용이고 케어 발송에 실명·계좌가 필요해 원본을 준다(사용자 결정 2026-11-26). 원본을 주는 새 응답은 이렇게 호출 역할을 하나로 제한한 API 에서만 만든다.
 - 보안 테스트는 `@SpringBootTest` + `@AutoConfigureMockMvc`(`org.springframework.boot.webmvc.test.autoconfigure`)로 상태 코드와 `code` 를 단언한다.
