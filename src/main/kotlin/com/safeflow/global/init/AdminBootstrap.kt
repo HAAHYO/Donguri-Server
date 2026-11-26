@@ -32,7 +32,12 @@ class AdminBootstrap(
         check(properties.username.isNotBlank() && properties.password.isNotBlank()) {
             "FDS_ADMIN_USERNAME 과 FDS_ADMIN_PASSWORD 는 함께 설정해야 합니다."
         }
+        check(properties.username == properties.username.trim()) { "FDS_ADMIN_USERNAME 앞뒤에 공백이 있습니다." }
+        check(properties.username.length <= MAX_USERNAME_LENGTH) { "FDS_ADMIN_USERNAME 은 ${MAX_USERNAME_LENGTH}자 이하여야 합니다." }
         check(properties.password.length >= MIN_PASSWORD_LENGTH) { "FDS_ADMIN_PASSWORD 는 ${MIN_PASSWORD_LENGTH}자 이상이어야 합니다." }
+        check(properties.password.toByteArray().size <= MAX_PASSWORD_BYTES) {
+            "FDS_ADMIN_PASSWORD 는 ${MAX_PASSWORD_BYTES}바이트(UTF-8) 이하여야 합니다."
+        }
 
         val encoded = requireNotNull(passwordEncoder.encode(properties.password))
         employeeRepository.save(Employee(properties.username, encoded, EmployeeRole.FDS_ADMIN, DEPARTMENT))
@@ -41,6 +46,8 @@ class AdminBootstrap(
 
     companion object {
         const val MIN_PASSWORD_LENGTH = 12
+        const val MAX_PASSWORD_BYTES = 72
+        const val MAX_USERNAME_LENGTH = 50
         private const val DEPARTMENT = "이상거래탐지팀"
     }
 }
