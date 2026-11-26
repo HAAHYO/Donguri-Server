@@ -90,11 +90,12 @@ jobs:
 
       # 배포 가능한 이미지인지 확인: 실제로 컨테이너를 띄워 헬스체크가 UP 이어야 한다.
       # Render 처럼 PORT 를 주고 그 포트로 확인한다 (기본값 8080 이 아닌 포트로 떠야 통과).
-      # Render free 인스턴스와 같은 자원(512 MB, 0.1 CPU)으로 제한해 메모리 부족과 느린 기동을 배포 전에 잡는다
+      # Render free 인스턴스와 같은 자원(512 MB, 0.1 CPU)으로 제한해 메모리 부족과 느린 기동을 배포 전에 잡는다.
+      # 스왑도 512 MB 로 막아야 메모리 초과가 스왑으로 가려지지 않는다
       - name: Smoke test image
         run: |
           docker run -d --name smoke --network host \
-            --memory 512m --cpus 0.1 \
+            --memory 512m --memory-swap 512m --cpus 0.1 \
             -e PORT=18081 \
             -e SPRING_PROFILES_ACTIVE=prod \
             -e DB_URL='jdbc:mysql://127.0.0.1:4000/fds_bank?createDatabaseIfNotExist=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8&sessionVariables=innodb_lock_wait_timeout=3' \
