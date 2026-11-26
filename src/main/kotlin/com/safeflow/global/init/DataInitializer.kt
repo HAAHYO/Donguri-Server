@@ -3,6 +3,7 @@ package com.safeflow.global.init
 import com.safeflow.domain.customer.entity.Customer
 import com.safeflow.domain.customer.entity.CustomerGrade
 import com.safeflow.domain.customer.repository.CustomerRepository
+import com.safeflow.domain.customer.service.ChurnService
 import com.safeflow.domain.employee.entity.Employee
 import com.safeflow.domain.employee.entity.EmployeeRole
 import com.safeflow.domain.employee.repository.EmployeeRepository
@@ -27,6 +28,7 @@ class DataInitializer(
     private val customerRepository: CustomerRepository,
     private val transactionRepository: TransactionRepository,
     private val passwordEncoder: PasswordEncoder,
+    private val churnService: ChurnService,
     @Value("\${fds.seed.employee-password:}") private val seedPassword: String,
 ) : ApplicationRunner {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -60,6 +62,7 @@ class DataInitializer(
 
         val customers = customerRepository.saveAll(seedCustomers())
         transactionRepository.saveAll(seedTransactions(customers))
+        customers.forEach(churnService::recalculate)
         log.info("고객 {}명, 거래 {}건을 시딩했습니다.", customers.size, transactionRepository.count())
     }
 
