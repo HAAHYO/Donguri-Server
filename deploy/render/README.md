@@ -105,8 +105,29 @@ FDS_ADMIN_PASSWORD=<12자 이상 비밀번호>
 | `FDS_ADMIN_PASSWORD 는 72바이트(UTF-8) 이하여야 합니다` 로 기동 실패 | BCrypt 한계다. 영문 기준 72자, 한글은 24자 이하로 줄인다 |
 | `FDS_ADMIN_USERNAME 과 FDS_ADMIN_PASSWORD 는 함께 설정해야 합니다` 로 기동 실패 | 직원이 없는데 둘 중 하나만 넣었다. 둘 다 넣거나 둘 다 지운다 |
 | `FDS_ADMIN_USERNAME 앞뒤에 공백이 있습니다` / `50자 이하여야 합니다` 로 기동 실패 | 대시보드 값의 앞뒤 공백을 지우고 50자 이하로 줄인다 |
-| 첫 배포 뒤 로그인이 401 | 첫 기동 때 `FDS_ADMIN_USERNAME`·`FDS_ADMIN_PASSWORD` 가 없었다. 두 값을 넣으면 다시 배포되면서, 직원이 0명이므로 계정이 만들어진다 |
+| 첫 배포 뒤 로그인이 401, TiDB 에서 `SELECT COUNT(*) FROM safeflow.employee;` 가 **0** | 계정이 만들어지지 않았다 (첫 기동 때 `FDS_ADMIN_USERNAME`·`FDS_ADMIN_PASSWORD` 가 없었음). 두 값을 넣으면 다시 배포되면서, 직원이 0명이므로 계정이 만들어진다 |
+| 첫 배포 뒤 로그인이 401, 같은 쿼리가 **1 이상** | 계정은 있고 입력한 아이디·비밀번호가 다르다. 재배포로는 고쳐지지 않는다(직원이 있으면 덮어쓰지 않음) — 아래 "첫 관리자 비밀번호를 잘못 넣었을 때". 로그로 판단하지 않는다: 생성 로그는 첫 기동 때만 찍히고, 이후 기동은 `직원 계정이 이미 있어 …` 를 찍거나(변수가 있을 때) 아무것도 찍지 않는다 |
 | 브라우저 콘솔에 `blocked by CORS policy`, 또는 API 가 본문 `Invalid CORS request` 로 403 | `CORS_ALLOWED_ORIGINS` 에 프론트 주소가 없거나 다름 (스킴 `https://` 포함, 끝 `/` 없이). 값을 고치면 Render 가 다시 배포한다 |
+
+### 첫 관리자 비밀번호를 잘못 넣었을 때
+
+직원이 그 관리자 **한 명뿐일 때만** 쓰는 절차다. 계정을 지우고, 직원이 0명인 상태로 다시 기동해 새로 만든다.
+
+1. TiDB **SQL Editor** 에서 직원을 조회한다. 결과가 **정확히 1행이고 `role` 이 `FDS_ADMIN`** 일 때만 계속한다:
+   ```sql
+   SELECT id, username, role FROM safeflow.employee;
+   ```
+   - 0행이면 계정이 없는 것이다 — 이 절차가 아니라 위 표의 "쿼리가 0" 행대로 변수를 넣고 재배포한다.
+   - 2행 이상이면 멈춘다 (다른 직원 계정까지 지우게 된다).
+2. 1단계 결과의 `username` 을 그대로 복사해 그 관리자를 지운다 (직접 타이핑하면 대소문자·오타로 0행이 지워질 수 있다). 직원을 참조하는 외래 키는 없다 (`care_action.sent_by` 는 아이디 문자열이다):
+   ```sql
+   DELETE FROM safeflow.employee WHERE username = '<1단계의 username>';
+   ```
+   `1 row affected` 가 아니면 멈추고 1단계부터 다시 확인한다.
+3. Render **Environment** 에서 `FDS_ADMIN_USERNAME`·`FDS_ADMIN_PASSWORD` 를 올바른 값으로 넣고 저장한다 (지웠다면 다시 넣는다). 저장하면 다시 배포된다.
+4. Logs 에 `첫 관리자 계정 <아이디> 을 만들었습니다` 가 다시 찍히는지 보고, "4. 첫 배포와 확인" 4단계로 로그인을 확인한 뒤 두 변수를 지운다.
+
+직원이 여러 명이 된 뒤의 비밀번호 재설정은 앱에 아직 없다.
 
 ### 롤백과 DB 마이그레이션
 
