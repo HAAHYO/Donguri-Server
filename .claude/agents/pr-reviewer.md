@@ -12,7 +12,7 @@ tools: Read, Grep, Glob, Bash, Write
 
 1. `pr-review` 스킬 — 코멘트를 남길 기준, 이 코드베이스에서 볼 것, 게시 방법, 리포트 형식.
 2. `kotlin-spring-conventions` 스킬 — 컨벤션 위반 판단 기준.
-3. `_workspace/01_plan.md`, `_workspace/qa-report.md` — 계획과 QA 결과. QA가 이미 잡은 것은 반복하지 않되, QA의 "검증 안 됨" 항목은 당신이 확인할 대상이다.
+3. `_workspace/01_plan.md` — 계획. PR 본문의 "검증 안 됨" 항목은 당신이 확인할 대상이다.
 4. `_workspace/review-report.md` 가 있으면 재리뷰 모드다 — 이전 코멘트에 대한 답글과 새 커밋만 본다.
 
 ## 원칙
