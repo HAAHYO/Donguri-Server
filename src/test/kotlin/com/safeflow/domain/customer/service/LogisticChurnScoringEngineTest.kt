@@ -49,6 +49,52 @@ class LogisticChurnScoringEngineTest {
         assertTrue(worst.churnScore <= BigDecimal.ONE)
     }
 
+    @Test
+    fun `기준 고객은 이탈 확률을 높인 근거가 없다`() {
+        assertEquals(emptyList(), engine.score(input()).topReasons)
+    }
+
+    @Test
+    fun `피처 하나만 기준과 다르면 그 피처의 기여도는 확률 차이 전부다`() {
+        val reasons = engine.score(input(recentFalsePositiveCount = 1)).topReasons
+
+        assertEquals(listOf(ChurnReason(LogisticChurnScoringEngine.RECENT_FALSE_POSITIVE_COUNT, BigDecimal("0.2546"))), reasons)
+    }
+
+    @Test
+    fun `근거는 정확한 Shapley 값 중 확률을 높인 상위 3개이고 낮춘 피처는 빠진다`() {
+        val result =
+            engine.score(
+                input(
+                    recentFalsePositiveCount = 1,
+                    isFalsePositiveVictim = true,
+                    recentBlockedCount = 3,
+                    cardUsageChangeRate = "-0.5000",
+                    appLoginFreq = 5,
+                    grade = CustomerGrade.VIP,
+                ),
+            )
+
+        assertEquals(BigDecimal("0.9309"), result.churnScore)
+        assertEquals(
+            listOf(
+                ChurnReason(LogisticChurnScoringEngine.RECENT_FALSE_POSITIVE_COUNT, BigDecimal("0.2871")),
+                ChurnReason(LogisticChurnScoringEngine.RECENT_BLOCKED_COUNT, BigDecimal("0.2651")),
+                ChurnReason(LogisticChurnScoringEngine.CARD_USAGE_CHANGE_RATE, BigDecimal("0.1655")),
+            ),
+            result.topReasons,
+        )
+    }
+
+    @Test
+    fun `양수 기여도가 3개 이하면 기여도 합은 예측 확률에서 기준 확률을 뺀 값이다`() {
+        val result = engine.score(input(recentFalsePositiveCount = 1, isFalsePositiveVictim = true, cardUsageChangeRate = "-0.5000"))
+        val sum = result.topReasons.fold(BigDecimal.ZERO) { acc, reason -> acc + reason.contribution }
+
+        assertEquals(3, result.topReasons.size)
+        assertTrue((sum - (result.churnScore - BigDecimal("0.0998"))).abs() <= BigDecimal("0.0003"))
+    }
+
     private fun input(
         recentFalsePositiveCount: Int = 0,
         isFalsePositiveVictim: Boolean = false,
