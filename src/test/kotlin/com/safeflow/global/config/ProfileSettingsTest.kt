@@ -1,6 +1,7 @@
 package com.safeflow.global.config
 
 import com.safeflow.domain.employee.repository.EmployeeRepository
+import com.safeflow.global.init.AdminBootstrap
 import com.safeflow.global.init.DataInitializer
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -53,8 +54,9 @@ class LocalProfileTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
     @Test
-    fun `local 프로필은 시딩과 SQL 로그, Swagger 를 켠다`() {
+    fun `local 프로필은 시딩과 SQL 로그, Swagger 를 켜고 운영용 첫 관리자 생성은 끈다`() {
         assertTrue(context.getBeanNamesForType(DataInitializer::class.java).isNotEmpty())
+        assertTrue(context.getBeanNamesForType(AdminBootstrap::class.java).isEmpty())
         assertEquals(2, employeeRepository.count())
         assertTrue(context.environment.getProperty("spring.jpa.show-sql", Boolean::class.java, false))
         mockMvc.get("/v3/api-docs").andExpect { status { isOk() } }
