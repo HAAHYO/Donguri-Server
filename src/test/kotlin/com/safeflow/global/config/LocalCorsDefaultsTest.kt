@@ -4,12 +4,14 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.env.StandardEnvironment
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class LocalCorsDefaultsTest {
     private val runner =
         ApplicationContextRunner()
+            .withInitializer { it.environment.propertySources.remove(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME) }
             .withInitializer(ConfigDataApplicationContextInitializer())
             .withUserConfiguration(CorsPropertiesConfig::class.java)
 
@@ -20,6 +22,13 @@ class LocalCorsDefaultsTest {
                 listOf("http://localhost:3000", "http://localhost:5173"),
                 context.getBean(CorsProperties::class.java).allowedOrigins,
             )
+        }
+    }
+
+    @Test
+    fun `local 프로필이어도 CORS_ALLOWED_ORIGINS 가 있으면 그 값만 허용한다`() {
+        runner.withPropertyValues("spring.profiles.active=local", "CORS_ALLOWED_ORIGINS=http://localhost:4000").run { context ->
+            assertEquals(listOf("http://localhost:4000"), context.getBean(CorsProperties::class.java).allowedOrigins)
         }
     }
 
